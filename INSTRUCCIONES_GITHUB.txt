@@ -1,0 +1,250 @@
+================================================================================
+  INSTRUCCIONES PARA SUBIR EL PROYECTO A GITHUB
+================================================================================
+
+🎉 ¡El repositorio local está listo!
+
+Commits realizados:
+  ✅ Commit inicial con todo el sistema (38 archivos, 6556 líneas)
+  ✅ LICENSE (MIT) agregado
+  ✅ README mejorado para GitHub
+
+================================================================================
+📝 PASO A PASO PARA CREAR EL REPOSITORIO EN GITHUB
+================================================================================
+
+PASO 1: CREAR EL REPOSITORIO EN GITHUB
+--------------------------------------------------------------------------------
+
+1. Abre tu navegador y ve a: https://github.com/charlyjuarezalbarracin
+
+2. Haz clic en el botón verde "New" o "New repository" (arriba a la derecha)
+
+3. Configuración del repositorio:
+   
+   Repository name: Charly_Predictor
+   
+   Description (opcional):
+   Sistema profesional de predicción Quini 6 con análisis estadístico y dual strategy
+   
+   Visibilidad:
+   ( ) Public       ← Visible para todos
+   (•) Private      ← Solo tú puedes verlo (recomendado si incluyes datos sensibles)
+   
+   ⚠️ IMPORTANTE: NO marques ninguna de estas opciones:
+      [ ] Add a README file
+      [ ] Add .gitignore
+      [ ] Choose a license
+   
+   (Ya las tenemos en el proyecto local)
+
+4. Haz clic en "Create repository"
+
+
+PASO 2: CONECTAR EL REPOSITORIO LOCAL CON GITHUB
+--------------------------------------------------------------------------------
+
+GitHub te mostrará una página con instrucciones. Ignórala y ejecuta estos comandos:
+
+En tu PowerShell (ya en la carpeta del proyecto):
+
+1. Agregar el remote (reemplaza con la URL que GitHub te dio):
+
+   git remote add origin https://github.com/charlyjuarezalbarracin/Charly_Predictor.git
+
+2. Verificar que se agregó correctamente:
+
+   git remote -v
+   
+   Debe mostrar:
+   origin  https://github.com/charlyjuarezalbarracin/Charly_Predictor.git (fetch)
+   origin  https://github.com/charlyjuarezalbarracin/Charly_Predictor.git (push)
+
+3. Renombrar la rama a main (GitHub usa 'main' por defecto ahora):
+
+   git branch -M main
+
+4. Hacer el push inicial:
+
+   git push -u origin main
+   
+   ⚠️ GitHub te pedirá autenticación:
+      - Usuario: charlyjuarezalbarracin
+      - Contraseña: Tu Personal Access Token (NO tu contraseña de GitHub)
+
+
+PASO 3: CREAR PERSONAL ACCESS TOKEN (SI NO LO TIENES)
+--------------------------------------------------------------------------------
+
+Si GitHub rechaza tu contraseña, necesitas un Personal Access Token:
+
+1. Ve a: https://github.com/settings/tokens
+
+2. Haz clic en "Generate new token" → "Generate new token (classic)"
+
+3. Configuración:
+   Note: Charly_Predictor Token
+   Expiration: 90 days (o lo que prefieras)
+   
+   Permisos (marca estos):
+   [x] repo (todos los sub-items)
+
+4. Haz clic en "Generate token"
+
+5. COPIA EL TOKEN (solo se muestra una vez!)
+   Ejemplo: ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+6. Usa ese token como contraseña cuando Git te lo pida
+
+
+PASO 4: VERIFICAR QUE SE SUBIÓ CORRECTAMENTE
+--------------------------------------------------------------------------------
+
+1. Ve a: https://github.com/charlyjuarezalbarracin/Charly_Predictor
+
+2. Deberías ver:
+   ✅ Todos tus archivos
+   ✅ El README.md mostrándose en la página principal
+   ✅ 2 commits
+   ✅ Carpetas: core/, tests/, utils/, etc.
+
+
+================================================================================
+🔄 COMANDOS PARA ACTUALIZACIONES FUTURAS
+================================================================================
+
+Cuando hagas cambios al proyecto:
+
+1. Ver qué cambió:
+   git status
+
+2. Agregar cambios:
+   git add .                    # Agregar todos los archivos modificados
+   git add archivo.py           # Agregar un archivo específico
+
+3. Hacer commit:
+   git commit -m "Descripción de los cambios"
+
+4. Subir a GitHub:
+   git push
+
+Ejemplo completo:
+   git add .
+   git commit -m "Actualizar datos históricos con sorteos de febrero"
+   git push
+
+
+================================================================================
+📁 ARCHIVOS QUE NO SE SUBIRÁN (ESTÁN EN .gitignore)
+================================================================================
+
+Por seguridad y buenas prácticas, estos archivos NO se suben a GitHub:
+
+✅ data/quini6_historico.csv     ← Tus datos históricos (privados)
+✅ configs/*.json                ← Configuraciones personales
+✅ __pycache__/                  ← Archivos temporales de Python
+✅ *.log                         ← Logs
+
+Si quieres subir tus datos históricos (NO recomendado si son privados):
+1. Edita .gitignore
+2. Comenta la línea: # data/*.csv
+3. Haz commit y push
+
+
+================================================================================
+🌟 MEJORAR LA PRESENTACIÓN EN GITHUB
+================================================================================
+
+OPCIONAL 1: Usar el README mejorado como README principal
+
+   git mv README_GITHUB.md README.md
+   git commit -m "Update README for better GitHub presentation"
+   git push
+
+OPCIONAL 2: Agregar imagen/logo del proyecto
+
+   1. Crea una carpeta: docs/images/
+   2. Agrega una imagen: logo.png
+   3. En README.md, agrega al inicio:
+      ![Charly Predictor](docs/images/logo.png)
+   4. Commit y push
+
+OPCIONAL 3: Agregar badges (ya incluidos en README_GITHUB.md)
+
+   - Python version
+   - License
+   - Build status (cuando configures CI/CD)
+
+
+================================================================================
+🔐 SEGURIDAD Y PRIVACIDAD
+================================================================================
+
+⚠️ NUNCA SUBAS:
+   - Contraseñas o tokens en el código
+   - Datos personales sensibles
+   - APIs keys o credenciales
+
+✅ SI QUIERES HACER EL REPO PÚBLICO:
+   1. Ve a Settings del repo en GitHub
+   2. Baja hasta "Danger Zone"
+   3. "Change repository visibility" → Public
+   
+⚠️ Pero primero asegúrate de que NO hay datos sensibles
+
+
+================================================================================
+📋 RESUMEN DE COMANDOS (COPIAR Y PEGAR)
+================================================================================
+
+# 1. Conectar con GitHub
+git remote add origin https://github.com/charlyjuarezalbarracin/Charly_Predictor.git
+
+# 2. Renombrar rama
+git branch -M main
+
+# 3. Subir todo
+git push -u origin main
+
+# Listo! Tu proyecto está en GitHub 🎉
+
+
+================================================================================
+❓ TROUBLESHOOTING
+================================================================================
+
+PROBLEMA: "remote origin already exists"
+SOLUCIÓN: 
+   git remote remove origin
+   git remote add origin https://github.com/charlyjuarezalbarracin/Charly_Predictor.git
+
+PROBLEMA: "Authentication failed"
+SOLUCIÓN: 
+   Usa Personal Access Token en lugar de contraseña
+   Ver PASO 3 arriba
+
+PROBLEMA: "failed to push some refs"
+SOLUCIÓN: 
+   git pull origin main --rebase
+   git push -u origin main
+
+PROBLEMA: "Permission denied"
+SOLUCIÓN: 
+   Verifica que el repositorio existe en tu cuenta
+   Verifica que tienes permisos de escritura
+
+
+================================================================================
+✅ SIGUIENTE PASO
+================================================================================
+
+Ejecuta este comando para conectar y subir todo:
+
+   git remote add origin https://github.com/charlyjuarezalbarracin/Charly_Predictor.git
+   git branch -M main
+   git push -u origin main
+
+(Después de crear el repositorio en GitHub primero!)
+
+
+================================================================================

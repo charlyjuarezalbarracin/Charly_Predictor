@@ -1,0 +1,276 @@
+================================================================================
+  GUÍA DE TRABAJO CON RAMAS EN GIT
+================================================================================
+
+🌿 ESTRATEGIA DE RAMAS PARA TU PROYECTO
+================================================================================
+
+RAMAS PRINCIPALES:
+  main           → Código estable, producción (lo que está en GitHub)
+  feature.local  → Desarrollo local, nuevas características
+
+FLUJO DE TRABAJO:
+  1. Trabajas en feature.local
+  2. Cuando algo está listo, lo mergeas a main
+  3. Subes main a GitHub
+
+
+================================================================================
+📝 COMANDOS PARA CREAR Y USAR LA RAMA feature.local
+================================================================================
+
+PASO 1: CREAR LA RAMA feature.local
+--------------------------------------------------------------------------------
+
+# Crear la rama y cambiarte a ella
+git checkout -b feature.local
+
+# Verificar que estás en la rama correcta
+git branch
+
+Deberías ver:
+  main
+* feature.local    ← El asterisco indica la rama actual
+
+
+PASO 2: TRABAJAR EN feature.local
+--------------------------------------------------------------------------------
+
+Ahora TODOS tus cambios se guardarán en esta rama:
+
+# Hacer cambios en archivos...
+# Editar mi_predictor.py, agregar features, etc.
+
+# Ver qué cambió
+git status
+
+# Agregar cambios
+git add .
+
+# Hacer commit
+git commit -m "Add: Nueva funcionalidad X"
+
+# Repetir según necesites
+
+
+PASO 3: VER EN QUÉ RAMA ESTÁS
+--------------------------------------------------------------------------------
+
+En cualquier momento:
+
+git branch
+
+Muestra todas las ramas y marca con * la actual.
+
+
+PASO 4: CAMBIAR ENTRE RAMAS
+--------------------------------------------------------------------------------
+
+# Ir a main
+git checkout main
+
+# Volver a feature.local
+git checkout feature.local
+
+
+PASO 5: CUANDO QUIERAS INTEGRAR TUS CAMBIOS A MAIN
+--------------------------------------------------------------------------------
+
+Cuando hayas terminado una funcionalidad en feature.local:
+
+# 1. Asegurarte de que todo está commiteado
+git status    # Debe decir "nothing to commit"
+
+# 2. Ir a main
+git checkout main
+
+# 3. Mergear feature.local en main
+git merge feature.local
+
+# 4. Subir a GitHub
+git push
+
+
+PASO 6: SUBIR feature.local A GITHUB (OPCIONAL)
+--------------------------------------------------------------------------------
+
+Si quieres tener tu rama de desarrollo también en GitHub:
+
+# Primera vez
+git push -u origin feature.local
+
+# Siguientes veces
+git push
+
+
+================================================================================
+🔄 FLUJO DE TRABAJO DIARIO
+================================================================================
+
+RUTINA TÍPICA:
+
+1. INICIAR EL DÍA
+   git checkout feature.local    # Asegurarte de estar en la rama correcta
+   git status                    # Ver el estado
+
+2. DESARROLLAR
+   # Editar archivos, agregar features, etc.
+
+3. GUARDAR PROGRESO
+   git add .
+   git commit -m "Work in progress: nueva funcionalidad"
+
+4. AL TERMINAR UNA FUNCIONALIDAD COMPLETA
+   git checkout main
+   git merge feature.local
+   git push                      # Subir a GitHub
+
+5. CONTINUAR TRABAJANDO
+   git checkout feature.local
+   # Seguir desarrollando...
+
+
+================================================================================
+📋 COMANDOS RÁPIDOS DE REFERENCIA
+================================================================================
+
+# Ver rama actual
+git branch
+
+# Cambiar de rama
+git checkout <nombre-rama>
+
+# Crear nueva rama y cambiarte a ella
+git checkout -b <nombre-rama>
+
+# Ver diferencias entre ramas
+git diff main feature.local
+
+# Ver commits de la rama actual
+git log --oneline
+
+# Ver estado actual
+git status
+
+# Eliminar una rama (solo si ya la mergeaste)
+git branch -d <nombre-rama>
+
+
+================================================================================
+🎯 EJEMPLO PRÁCTICO: AGREGAR NUEVA FUNCIONALIDAD
+================================================================================
+
+Supongamos que quieres agregar una nueva funcionalidad al predictor:
+
+# 1. Ir a rama de desarrollo
+git checkout feature.local
+
+# 2. Hacer cambios
+# Editas mi_predictor.py para agregar opción de exportar a Excel
+
+# 3. Probar que funciona
+py mi_predictor.py
+
+# 4. Si funciona bien, commitear
+git add mi_predictor.py
+git commit -m "Add: Funcionalidad de exportar resultados a Excel"
+
+# 5. Hacer más cambios si quieres
+# Editas otro archivo...
+git add .
+git commit -m "Fix: Correcciones en validación de datos"
+
+# 6. Cuando todo esté listo, integrar a main
+git checkout main
+git merge feature.local
+
+# 7. Subir a GitHub
+git push
+
+# 8. Volver a trabajar en feature.local
+git checkout feature.local
+
+
+================================================================================
+⚠️ BUENAS PRÁCTICAS
+================================================================================
+
+✅ HACER:
+  - Trabajar siempre en feature.local para desarrollo
+  - Hacer commits frecuentes con mensajes descriptivos
+  - Mergear a main solo código que funciona
+  - Probar antes de mergear
+
+❌ EVITAR:
+  - Trabajar directamente en main
+  - Commits con mensaje "update" o "cambios"
+  - Mergear código que no probaste
+  - Perder de vista en qué rama estás
+
+
+================================================================================
+🆘 SOLUCIÓN A PROBLEMAS COMUNES
+================================================================================
+
+PROBLEMA: Hice cambios en la rama equivocada
+SOLUCIÓN:
+  # Si no hiciste commit todavía
+  git stash                    # Guardar cambios temporalmente
+  git checkout feature.local   # Ir a la rama correcta
+  git stash pop                # Recuperar cambios
+
+PROBLEMA: Quiero descartar todos los cambios no guardados
+SOLUCIÓN:
+  git checkout -- .            # ⚠️ Esto borra cambios sin commit
+
+PROBLEMA: Me equivoqué en un commit
+SOLUCIÓN:
+  git commit --amend -m "Nuevo mensaje correcto"
+
+PROBLEMA: Quiero ver qué cambié antes de commitear
+SOLUCIÓN:
+  git diff                     # Ver cambios no agregados
+  git diff --staged            # Ver cambios agregados (staged)
+
+
+================================================================================
+💡 CONVENCIÓN DE NOMBRES DE COMMIT
+================================================================================
+
+Usa prefijos claros en tus commits:
+
+Add:     Agregar nueva funcionalidad
+Fix:     Corregir un bug
+Update:  Actualizar código existente
+Refactor: Reestructurar código
+Docs:    Cambios en documentación
+Test:    Agregar o modificar tests
+
+Ejemplos:
+  git commit -m "Add: Función de exportar a CSV"
+  git commit -m "Fix: Error en cálculo de scores"
+  git commit -m "Update: Mejorar performance del análisis"
+  git commit -m "Docs: Actualizar README con nuevas instrucciones"
+
+
+================================================================================
+🚀 COMANDOS PARA EMPEZAR AHORA
+================================================================================
+
+EJECUTA ESTOS COMANDOS EN ORDEN:
+
+# 1. Crear y cambiar a feature.local
+git checkout -b feature.local
+
+# 2. Verificar que estás en la rama correcta
+git branch
+
+# 3. ¡Listo! Ya puedes trabajar en esta rama
+
+Desde ahora:
+  - Todos tus cambios se guardan en feature.local
+  - main se mantiene estable
+  - Cuando quieras, mergeas a main y subes a GitHub
+
+
+================================================================================
