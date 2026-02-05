@@ -1,0 +1,366 @@
+================================================================================
+  CÓMO USAR EL SISTEMA AHORA (GUÍA RÁPIDA)
+================================================================================
+
+🎯 SITUACIÓN ACTUAL:
+  - Sistema 100% funcional
+  - Todo por consola (línea de comandos)
+  - NO necesitas datos históricos reales todavía
+  - El sistema genera datos de muestra automáticamente
+  - Sin interfaz gráfica (eso será la Etapa 2)
+
+
+================================================================================
+📋 OPCIÓN 1: QUIERO PROBAR EL SISTEMA RÁPIDO (RECOMENDADO)
+================================================================================
+
+EJECUTAR:
+  py ejemplo_uso.py
+
+LO QUE HACE:
+  1. Genera 200 sorteos de muestra automáticamente
+  2. Ejecuta todos los análisis estadísticos
+  3. Calcula scores de todos los números
+  4. Genera combinaciones candidatas
+  5. Ejecuta backtesting para validar
+  6. Te da una PREDICCIÓN FINAL de 6 números
+
+RESULTADO:
+  Verás en consola:
+  - Top 10 números con mejor score
+  - Combinación recomendada optimizada
+  - Combinaciones alternativas
+  - Resultados de backtesting
+  - Métricas de rendimiento
+
+TIEMPO: ~5-10 segundos
+
+
+================================================================================
+📋 OPCIÓN 2: COMPARAR AMBOS MÉTODOS DE PREDICCIÓN
+================================================================================
+
+EJECUTAR:
+  py ejemplo_comparacion_metodos.py
+
+LO QUE HACE:
+  1. Genera datos de muestra
+  2. Ejecuta AMBOS métodos de generación:
+     - Método Estándar (probabilidades estáticas)
+     - Método Condicional (probabilidades dinámicas)
+  3. Compara resultados lado a lado
+  4. Muestra estadísticas de 20 iteraciones
+  5. Te dice cuál método es mejor para qué
+
+RESULTADO:
+  Verás:
+  - Predicción con método ESTÁNDAR
+  - Predicción con método CONDICIONAL
+  - Comparación de scores
+  - Comparación de características
+  - Recomendaciones de uso
+
+IDEAL PARA: Entender las diferencias entre métodos
+
+TIEMPO: ~15-20 segundos
+
+
+================================================================================
+📋 OPCIÓN 3: USO PERSONALIZADO (SCRIPT PROPIO)
+================================================================================
+
+Si quieres controlar todo manualmente, crea tu propio script:
+
+CREAR ARCHIVO: mi_prediccion.py
+
+COPIAR ESTE CÓDIGO:
+
+# ============================================================
+# MI PREDICCIÓN PERSONALIZADA
+# ============================================================
+
+from core.data import DataLoader
+from core.analysis import FrequencyAnalyzer, CorrelationAnalyzer
+from core.scoring import UnifiedScorer
+from core.generator import StrategyManager, GenerationStrategy
+from utils.data_generator import generate_sample_data
+
+print("\n" + "="*70)
+print(" MI PREDICCIÓN PERSONALIZADA")
+print("="*70 + "\n")
+
+# 1. Generar o cargar datos
+print("📂 Generando datos de muestra...")
+sorteos = generate_sample_data(num_sorteos=200)  # Puedes cambiar la cantidad
+
+loader = DataLoader()
+data = loader.load_from_list(sorteos)
+print(f"✓ {len(data)} sorteos cargados\n")
+
+# 2. Análisis
+print("📊 Ejecutando análisis...")
+freq = FrequencyAnalyzer()
+freq.analyze(data)
+
+corr = CorrelationAnalyzer()
+corr.analyze(data)
+print("✓ Análisis completados\n")
+
+# 3. Scoring
+print("🎯 Calculando scores...")
+scorer = UnifiedScorer()
+scores = scorer.calculate_scores(freq)
+
+# Ver top 10
+top_10 = scorer.get_top_numbers(10)
+print("Top 10 números:")
+for i, (num, score) in enumerate(top_10, 1):
+    print(f"  {i:2d}. Número {num:2d} - Score: {score:.4f}")
+print()
+
+# 4. Generar predicción con el método que prefieras
+manager = StrategyManager()
+
+# OPCIÓN A: Método Estándar (rápido)
+print("🎲 MÉTODO ESTÁNDAR:")
+result_std = manager.generate(
+    scores,
+    strategy=GenerationStrategy.STANDARD,
+    use_constraints=True
+)
+print(f"   Predicción: {result_std['combination']}")
+print(f"   Score: {result_std['analysis']['score_promedio']:.4f}")
+print()
+
+# OPCIÓN B: Método Condicional (más inteligente)
+print("🎲 MÉTODO CONDICIONAL:")
+result_cond = manager.generate(
+    scores,
+    strategy=GenerationStrategy.CONDITIONAL,
+    correlation_analyzer=corr,
+    use_constraints=True,
+    correlation_weight=0.3  # Ajusta esto (0.0 a 1.0)
+)
+print(f"   Predicción: {result_cond['combination']}")
+print(f"   Score: {result_cond['analysis']['score_promedio']:.4f}")
+print(f"   Correlation Score: {result_cond['analysis']['correlation_score']:.4f}")
+print()
+
+# 5. Análisis de la predicción
+print("="*70)
+print(" 🎯 TU PREDICCIÓN FINAL")
+print("="*70)
+
+# Puedes elegir cuál usar
+prediccion_final = result_cond['combination']  # Cambia a result_std si prefieres
+print(f"\n  Números: {prediccion_final}")
+
+analysis = result_cond['analysis']
+print(f"\n  Suma: {analysis['suma_total']}")
+print(f"  Pares: {analysis['pares']}, Impares: {analysis['impares']}")
+print(f"  Consecutivos: {analysis['consecutivos']}")
+print(f"  Score promedio: {analysis['score_promedio']:.4f}")
+
+print("\n" + "="*70 + "\n")
+
+
+EJECUTAR TU SCRIPT:
+  py mi_prediccion.py
+
+
+================================================================================
+📋 OPCIÓN 4: CARGAR TUS DATOS HISTÓRICOS REALES
+================================================================================
+
+Si YA TIENES datos históricos del Quini 6:
+
+PASO 1: Crear archivo CSV
+  Crear: data/quini6_historico.csv
+
+PASO 2: Formato del CSV
+  sorteo_id,fecha,num1,num2,num3,num4,num5,num6
+  1,2024-01-01,5,12,23,34,41,45
+  2,2024-01-04,2,15,28,30,39,44
+  3,2024-01-08,7,11,19,22,33,42
+  ...
+
+PASO 3: Modificar el script
+  En lugar de:
+    sorteos = generate_sample_data(num_sorteos=200)
+    data = loader.load_from_list(sorteos)
+
+  Usar:
+    data = loader.load_csv('data/quini6_historico.csv')
+
+PASO 4: Ejecutar normalmente
+  py ejemplo_uso.py
+
+
+================================================================================
+🎮 FLUJO DE OPERACIÓN ACTUAL (TODO POR CONSOLA)
+================================================================================
+
+PASO A PASO DE LO QUE HACES:
+
+1️⃣ EJECUTAS UN SCRIPT
+   py ejemplo_uso.py  (o el que prefieras)
+
+2️⃣ VES RESULTADOS EN CONSOLA
+   El sistema te muestra:
+   - Análisis de frecuencias
+   - Top números calientes/fríos
+   - Scores calculados
+   - Combinaciones generadas
+   - Resultados de backtesting
+
+3️⃣ COPIAS LOS NÚMEROS PREDICHOS
+   Los números aparecen en consola, tipo:
+   🎯 PREDICCIÓN FINAL: [5, 7, 16, 17, 34, 41]
+
+4️⃣ USAS ESOS NÚMEROS
+   Para jugar, experimentar, o seguir analizando
+
+5️⃣ REPITES EL PROCESO
+   - Cada vez que ejecutas genera una nueva predicción
+   - Puedes ejecutar múltiples veces
+   - Puedes ajustar parámetros en el código
+
+
+================================================================================
+⚙️ PERSONALIZAR PARÁMETROS (SIN PROGRAMAR MUCHO)
+================================================================================
+
+CAMBIAR CANTIDAD DE DATOS DE MUESTRA:
+  En el script, busca:
+    sorteos = generate_sample_data(num_sorteos=200)
+  
+  Cambia a:
+    sorteos = generate_sample_data(num_sorteos=500)  # Más datos
+
+
+CAMBIAR PESO DE CORRELACIONES (Método Condicional):
+  Busca:
+    correlation_weight=0.3
+  
+  Cambia a un valor entre 0.0 y 1.0:
+    correlation_weight=0.5  # Más peso a correlaciones
+    correlation_weight=0.1  # Menos peso a correlaciones
+
+
+CAMBIAR RESTRICCIONES DE COMBINACIONES:
+  Al inicio del script agrega:
+  
+  from core.generator import CombinationGenerator
+  
+  gen = CombinationGenerator()
+  gen.update_constraints({
+      'min_pares': 3,          # Mínimo 3 números pares
+      'max_consecutivos': 1,   # Máximo 1 consecutivo
+      'suma_min': 80,          # Suma mínima
+      'suma_max': 180          # Suma máxima
+  })
+
+
+CAMBIAR PESOS DE SCORING:
+  from core.scoring import UnifiedScorer
+  
+  mis_pesos = {
+      'peso_frecuencia': 0.40,
+      'peso_frecuencia_reciente': 0.30,
+      'peso_ciclo': 0.15,
+      'peso_latencia': 0.10,
+      'peso_tendencia': 0.05,
+  }
+  
+  scorer = UnifiedScorer(mis_pesos)
+
+
+================================================================================
+🚀 ETAPA 2: INTERFAZ GRÁFICA (LO PRÓXIMO)
+================================================================================
+
+CUÁNDO HACERLA:
+  - Cuando ya te familiarices con el sistema
+  - Cuando sepas qué parámetros ajustar
+  - Cuando tengas datos históricos reales
+
+QUÉ TENDRÁ:
+  ✓ Pantalla para cargar datos CSV
+  ✓ Botón para ejecutar predicción
+  ✓ Selector de método (Estándar / Condicional / Ambos)
+  ✓ Sliders para ajustar pesos
+  ✓ Visualización de resultados en tabla
+  ✓ Gráficos de frecuencias
+  ✓ Exportar predicciones a archivo
+  ✓ Historial de predicciones
+  ✓ Comparación visual de métodos
+
+TECNOLOGÍAS POSIBLES:
+  - Tkinter (Python nativo, simple)
+  - PyQt5 (Profesional, más complejo)
+  - Streamlit (Web, muy fácil)
+  - Flask/FastAPI (Web API + Frontend)
+
+RECOMENDACIÓN:
+  Primero usa el sistema por consola algunas veces para entenderlo,
+  luego pasamos a la GUI.
+
+
+================================================================================
+💡 RESUMEN: ¿QUÉ HAGO AHORA?
+================================================================================
+
+SI QUIERES PROBAR RÁPIDO:
+  → py ejemplo_uso.py
+
+SI QUIERES VER AMBOS MÉTODOS:
+  → py ejemplo_comparacion_metodos.py
+
+SI TIENES DATOS HISTÓRICOS:
+  → Créalos en data/quini6_historico.csv
+  → Ejecuta py ejemplo_uso.py
+
+SI QUIERES PERSONALIZAR:
+  → Crea mi_prediccion.py con el código de arriba
+  → Ajusta los parámetros que quieras
+  → Ejecuta py mi_prediccion.py
+
+SI QUIERES INTERFAZ GRÁFICA:
+  → Primero familiarízate con el sistema por consola
+  → Luego te ayudo a crear la GUI (Etapa 2)
+
+
+================================================================================
+❓ PREGUNTAS FRECUENTES
+================================================================================
+
+P: ¿Necesito datos reales para empezar?
+R: NO. El sistema genera datos de muestra automáticamente.
+
+P: ¿Cómo sé si está funcionando bien?
+R: Ejecuta: py tests/test_strategies.py
+   Verás: 4/4 tests pasados ✅
+
+P: ¿Puedo cambiar parámetros sin programar?
+R: Por ahora hay que editar el código. La GUI facilitará esto.
+
+P: ¿Cuántas veces puedo ejecutar el script?
+R: Todas las que quieras. Cada ejecución es independiente.
+
+P: ¿Los resultados son determinísticos?
+R: No, cada ejecución puede dar resultados distintos porque:
+   - Usa probabilidades (aleatoriedad controlada)
+   - Algoritmos genéticos son estocásticos
+   - Puedes fijar semilla si quieres reproducibilidad
+
+P: ¿Qué método usar?
+R: Prueba AMBOS con ejemplo_comparacion_metodos.py y decide.
+
+P: ¿Cuántos datos históricos necesito?
+R: Mínimo 50 sorteos. Recomendado: 150-300 para buen análisis.
+
+P: ¿Cómo exporto resultados?
+R: Por ahora: copia desde consola. Con GUI: botón de exportar.
+
+
+================================================================================

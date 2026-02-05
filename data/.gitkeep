@@ -1,0 +1,14 @@
+# Este directorio contiene los datos históricos del Quini 6
+# Coloca aquí tus archivos CSV o JSON con los resultados históricos
+
+## Formato esperado para CSV:
+# sorteo_id,fecha,num1,num2,num3,num4,num5,num6
+
+## Formato esperado para JSON:
+# [
+#   {
+#     "sorteo_id": 1,
+#     "fecha": "2024-01-01",
+#     "numeros": [5, 12, 23, 34, 41, 45]
+#   }
+# ]

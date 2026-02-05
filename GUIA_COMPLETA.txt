@@ -1,0 +1,1015 @@
+================================================================================
+  CHARLY PREDICTOR - SISTEMA DE PREDICCIÓN DE QUINI 6
+  Guía Completa del Sistema
+================================================================================
+
+📦 ESTRUCTURA COMPLETA DEL PROYECTO
+================================================================================
+
+Charly_Predictor/
+│
+├── core/                           # Core del sistema
+│   ├── __init__.py
+│   ├── config.py                   # Configuración global
+│   │
+│   ├── data/                       # Módulo de datos
+│   │   ├── __init__.py
+│   │   ├── loader.py              # Carga CSV/JSON
+│   │   ├── validator.py           # Validación de integridad
+│   │   └── preprocessor.py        # Cálculo de features
+│   │
+│   ├── analysis/                   # Motor de análisis
+│   │   ├── __init__.py
+│   │   ├── frequency.py           # Análisis de frecuencias
+│   │   ├── patterns.py            # Patrones temporales
+│   │   └── correlations.py        # Co-ocurrencias
+│   │
+│   ├── scoring/                    # Sistema de scoring
+│   │   ├── __init__.py
+│   │   ├── scorer.py              # Scoring unificado
+│   │   └── weights.py             # Gestión de pesos
+│   │
+│   ├── generator/                  # Generación de combinaciones
+│   │   ├── __init__.py
+│   │   ├── combination.py         # Generador estándar
+│   │   ├── optimizer.py           # Algoritmos genéticos
+│   │   ├── strategy_manager.py    # Gestor de estrategias
+│   │   └── advanced/              # Métodos avanzados (NUEVO)
+│   │       ├── __init__.py
+│   │       └── conditional_generator.py  # Probabilidades condicionales
+│   │
+│   └── backtesting/                # Validación
+│       ├── __init__.py
+│       ├── backtester.py          # Sistema de backtesting
+│       └── evaluator.py           # Métricas de rendimiento
+│
+├── tests/                          # Suite de tests (NUEVO)
+│   ├── __init__.py
+│   └── test_strategies.py         # Tests de estrategias
+│
+├── utils/                          # Utilidades
+│   ├── __init__.py
+│   └── data_generator.py          # Generador de datos de muestra
+│
+├── data/                           # Datos históricos
+│   └── .gitkeep
+│
+├── configs/                        # Perfiles de pesos
+│   └── .gitkeep
+│
+├── ejemplo_uso.py                  # Ejemplo básico completo
+├── ejemplo_comparacion_metodos.py  # Comparación de métodos (NUEVO)
+├── test_instalacion.py            # Test de verificación rápida
+├── requirements.txt               # Dependencias
+├── README.md                      # Documentación rápida
+├── GUIA_COMPLETA.txt              # Esta guía
+└── .gitignore
+
+
+================================================================================
+🎯 FUNCIONALIDADES IMPLEMENTADAS
+================================================================================
+
+✅ 1. MÓDULO DE DATOS
+--------------------------------------------------------------------------------
+- Carga de CSV/JSON con datos históricos
+- Validación completa (números, rangos, duplicados)
+- Preprocesamiento automático de features (suma, pares, consecutivos, etc.)
+
+  Archivos:
+  - core/data/loader.py      → Carga datos desde CSV, JSON o listas
+  - core/data/validator.py   → Valida integridad de datos
+  - core/data/preprocessor.py → Calcula features matemáticos adicionales
+
+
+✅ 2. MOTOR DE ANÁLISIS MULTI-DIMENSIONAL
+--------------------------------------------------------------------------------
+
+A. ANÁLISIS DE FRECUENCIAS (core/analysis/frequency.py)
+   - Frecuencia absoluta y relativa
+   - Frecuencia reciente (últimos N sorteos configurables)
+   - Números calientes y fríos
+   - Ciclos de aparición (cada cuántos sorteos aparece un número)
+   - Latencia (tiempo desde última aparición)
+   - Tendencias (aceleración/desaceleración)
+
+B. ANÁLISIS DE PATRONES TEMPORALES (core/analysis/patterns.py)
+   - Detección de rachas y sequías
+   - Análisis de patrones mensuales
+   - Estacionalidad
+
+C. ANÁLISIS DE CORRELACIONES (core/analysis/correlations.py)
+   - Pares que salen juntos frecuentemente
+   - Tripletas recurrentes
+   - Anti-correlaciones (números que NO salen juntos)
+   - Compañeros favorables por número
+
+
+✅ 3. SISTEMA DE SCORING CON PESOS CONFIGURABLES
+--------------------------------------------------------------------------------
+
+FÓRMULA DE SCORING:
+
+  Score(numero) = 
+      w1 × frecuencia_normalizada +
+      w2 × frecuencia_reciente +
+      w3 × ciclo_esperado +
+      w4 × latencia_inversa +
+      w5 × tendencia
+
+CARACTERÍSTICAS:
+- Pesos totalmente configurables
+- Perfiles predefinidos:
+  * balanced: Equilibrio entre todas las métricas
+  * frequency_focused: Prioriza números más frecuentes
+  * recent_trends: Prioriza tendencias recientes
+  * conservative: Prioriza números con mayor latencia
+- Normalización automática de valores
+- Desglose detallado por componente
+
+Archivos:
+- core/scoring/scorer.py   → Sistema de scoring unificado
+- core/scoring/weights.py  → Gestión de perfiles de pesos
+
+
+✅ 4. GENERADOR DE COMBINACIONES
+--------------------------------------------------------------------------------
+
+MÉTODOS DE GENERACIÓN:
+1. Simple: Toma los 6 números con mayor score
+2. Con restricciones: Aplica reglas configurables
+3. Portfolio: Genera múltiples combinaciones diversas
+
+RESTRICCIONES CONFIGURABLES:
+- Mínimo/máximo de números pares
+- Mínimo/máximo de números impares
+- Mínimo/máximo de números consecutivos
+- Rango de suma total de la combinación
+- Distribución por tercio (bajo: 0-15, medio: 16-30, alto: 31-45)
+- Mínimo de números por cada rango
+
+ANÁLISIS DE COMBINACIONES:
+- Suma total
+- Cantidad de pares/impares
+- Números consecutivos
+- Distribución por rangos
+- Score promedio
+- Validación de restricciones
+
+Archivos:
+- core/generator/combination.py → Generador con restricciones
+- core/generator/optimizer.py   → Algoritmos de optimización
+
+
+✅ 5. OPTIMIZACIÓN AVANZADA
+--------------------------------------------------------------------------------
+
+ALGORITMO GENÉTICO:
+- Evoluciona combinaciones hacia mejores scores
+- Parámetros configurables:
+  * Tamaño de población
+  * Número de generaciones
+  * Tasa de mutación
+  * Tamaño de elite
+- Operadores: Selección por torneo, crossover, mutación
+
+MONTE CARLO SEARCH:
+- Explora espacio de posibilidades aleatoriamente
+- Selección ponderada por scores
+- Retorna mejores combinaciones encontradas
+
+PORTFOLIO OPTIMIZATION:
+- Balance entre calidad (score) y diversidad (cobertura)
+- Minimiza duplicación de números
+- Maximiza cobertura total del portfolio
+
+
+✅ 6. SISTEMA DE BACKTESTING
+--------------------------------------------------------------------------------
+
+FUNCIONAMIENTO:
+1. Divide datos históricos en train/test
+2. Entrena modelo con datos de train
+3. Genera predicciones para cada sorteo de test
+4. Compara predicciones con resultados reales
+5. Calcula métricas de rendimiento
+
+MÉTRICAS CALCULADAS:
+- Distribución de aciertos (6/6, 5/6, 4/6, 3/6, 2/6, 1/6, 0/6)
+- Porcentaje de cada categoría de aciertos
+- Promedio de aciertos
+- Tasa de aciertos significativos (3 o más)
+- Mejor y peor predicción
+- ROI simulado (con premios ficticios)
+
+COMPARACIÓN DE CONFIGURACIONES:
+- Permite probar múltiples configuraciones de pesos
+- Compara rendimiento de cada configuración
+- Identifica la mejor configuración para los datos
+
+Archivos:
+- core/backtesting/backtester.py → Sistema de backtesting
+- core/backtesting/evaluator.py  → Evaluador de rendimiento
+
+
+✅ 7. EVALUADOR DE RENDIMIENTO
+--------------------------------------------------------------------------------
+
+MÉTRICAS:
+- Total de predicciones evaluadas
+- Promedio de aciertos
+- Desviación estándar
+- Mínimo y máximo de aciertos
+- Mediana de aciertos
+- Distribución de aciertos
+- Tasas de hit por categoría
+- Precisión por número individual
+- ROI simulado
+
+FUNCIONES:
+- Agregar predicciones para evaluación
+- Calcular métricas completas
+- Identificar mejores números
+- Generar reportes detallados
+- Exportar métricas a JSON
+
+
+================================================================================
+🚀 CÓMO USAR EL SISTEMA
+================================================================================
+
+PASO 1: INSTALAR DEPENDENCIAS
+--------------------------------------------------------------------------------
+
+  WINDOWS:
+    py -m pip install -r requirements.txt
+
+  LINUX/MAC:
+    python -m pip install -r requirements.txt
+
+  Dependencias requeridas:
+  - pandas >= 1.5.0
+  - numpy >= 1.23.0
+
+
+PASO 2: VERIFICAR INSTALACIÓN
+--------------------------------------------------------------------------------
+
+  WINDOWS:
+    py test_instalacion.py
+
+  LINUX/MAC:
+    python test_instalacion.py
+
+  ✅ Debe mostrar:
+    - ✓ Todas las importaciones exitosas
+    - ✓ Datos generados, cargados y validados
+    - ✓ Análisis completado
+    - ✓ Combinación generada
+    - ✓ Backtesting completado
+    - ✓✓✓ TODOS LOS TESTS PASARON EXITOSAMENTE ✓✓✓
+
+
+PASO 3: EJECUTAR TESTS DEL SISTEMA (OPCIONAL)
+--------------------------------------------------------------------------------
+
+  WINDOWS:
+    py tests/test_strategies.py
+
+  LINUX/MAC:
+    python tests/test_strategies.py
+
+  ✅ Este test verifica:
+    - Generador Condicional funciona correctamente
+    - StrategyManager cambia entre métodos
+    - NO hay duplicados en 100 iteraciones de cada método
+    - Comparación estadística funciona
+
+  Resultado esperado: 4/4 tests pasados 🎉
+
+
+PASO 4: PREPARAR DATOS HISTÓRICOS
+--------------------------------------------------------------------------------
+
+OPCIÓN A: Usar tus datos reales del Quini 6
+
+  1. Crea un archivo CSV en: data/quini6_historico.csv
+  
+  2. Formato esperado:
+     sorteo_id,fecha,num1,num2,num3,num4,num5,num6
+     1,2024-01-01,5,12,23,34,41,45
+     2,2024-01-04,2,15,28,30,39,44
+     ...
+
+OPCIÓN B: Generar datos de muestra
+
+  WINDOWS:
+    py utils/data_generator.py
+
+  LINUX/MAC:
+    python utils/data_generator.py
+
+
+PASO 5: EJECUTAR EJEMPLO BÁSICO
+--------------------------------------------------------------------------------
+
+  WINDOWS:
+    py ejemplo_uso.py
+
+  LINUX/MAC:
+    python ejemplo_uso.py
+
+  Este script ejecuta el flujo completo:
+  1. Carga datos
+  2. Valida y preprocesa
+  3. Ejecuta análisis estadísticos
+  4. Calcula scores
+  5. Genera combinaciones
+  6. Ejecuta backtesting
+  7. Genera predicción final
+
+
+PASO 6: COMPARAR AMBOS MÉTODOS DE GENERACIÓN (NUEVO)
+--------------------------------------------------------------------------------
+
+  WINDOWS:
+    py ejemplo_comparacion_metodos.py
+
+  LINUX/MAC:
+    python ejemplo_comparacion_metodos.py
+
+  Este script muestra:
+  1. Método Estándar (probabilidades estáticas)
+  2. Método Condicional (probabilidades dinámicas)
+  3. Comparación lado a lado de ambos métodos
+  4. Comparación estadística (20 iteraciones)
+  5. Ejemplo de switch entre métodos (preparado para GUI)
+  7. Genera predicción final optimizada
+
+
+PASO 5: USO BÁSICO EN TU CÓDIGO
+--------------------------------------------------------------------------------
+
+from core.data import DataLoader
+from core.analysis import FrequencyAnalyzer
+from core.scoring import UnifiedScorer
+from core.generator import CombinationGenerator
+
+# Cargar datos históricos
+loader = DataLoader()
+data = loader.load_csv('data/quini6_historico.csv')
+
+# Analizar frecuencias
+analyzer = FrequencyAnalyzer()
+analyzer.analyze(data)
+
+# Calcular scores
+scorer = UnifiedScorer()
+scores = scorer.calculate_scores(analyzer)
+
+# Generar predicción
+generator = CombinationGenerator()
+prediccion = generator.generate_with_constraints(scores)
+
+print(f"🎯 Predicción: {prediccion}")
+
+
+PASO 6: USO DE ESTRATEGIAS DE GENERACIÓN (AVANZADO)
+--------------------------------------------------------------------------------
+
+El sistema incluye DOS métodos de generación separados:
+
+📊 MÉTODO 1: ESTÁNDAR (CombinationGenerator)
+  - Selecciona 6 números simultáneamente
+  - Probabilidades estáticas basadas en scores individuales
+  - Más rápido
+  - Ideal para generar portfolios grandes
+
+📊 MÉTODO 2: CONDICIONAL (ConditionalGenerator)
+  - Selecciona números secuencialmente (uno por uno)
+  - Recalcula probabilidades después de cada selección
+  - Considera correlaciones con números ya seleccionados
+  - Más inteligente pero más lento
+  - Ideal para predicción final
+
+
+USAR EL GESTOR DE ESTRATEGIAS:
+
+from core.data import DataLoader
+from core.analysis import FrequencyAnalyzer, CorrelationAnalyzer
+from core.scoring import UnifiedScorer
+from core.generator import StrategyManager, GenerationStrategy
+
+# Preparar datos y análisis
+loader = DataLoader()
+data = loader.load_csv('data/quini6_historico.csv')
+
+freq_analyzer = FrequencyAnalyzer()
+freq_analyzer.analyze(data)
+
+# ⚠️ El método condicional REQUIERE el analizador de correlaciones
+corr_analyzer = CorrelationAnalyzer()
+corr_analyzer.analyze(data)
+
+scorer = UnifiedScorer()
+scores = scorer.calculate_scores(freq_analyzer)
+
+# Crear el gestor de estrategias
+manager = StrategyManager()
+
+
+OPCIÓN A: USAR MÉTODO ESTÁNDAR
+
+result = manager.generate(
+    scores,
+    strategy=GenerationStrategy.STANDARD,
+    use_constraints=True
+)
+print(f"Estándar: {result['combination']}")
+
+
+OPCIÓN B: USAR MÉTODO CONDICIONAL
+
+result = manager.generate(
+    scores,
+    strategy=GenerationStrategy.CONDITIONAL,
+    correlation_analyzer=corr_analyzer,
+    use_constraints=True,
+    correlation_weight=0.3  # Peso de las correlaciones (0.0-1.0)
+)
+print(f"Condicional: {result['combination']}")
+print(f"Correlation Score: {result['analysis']['correlation_score']:.4f}")
+
+
+OPCIÓN C: GENERAR CON AMBOS MÉTODOS
+
+result = manager.generate(
+    scores,
+    strategy=GenerationStrategy.BOTH,
+    correlation_analyzer=corr_analyzer
+)
+print(f"Estándar:    {result['standard']['combination']}")
+print(f"Condicional: {result['conditional']['combination']}")
+
+
+COMPARAR MÉTODOS LADO A LADO:
+
+predictions = manager.generate_side_by_side(scores, corr_analyzer)
+print(f"Estándar:    {predictions['standard']}")
+print(f"Condicional: {predictions['conditional']}")
+
+
+COMPARACIÓN ESTADÍSTICA (N iteraciones):
+
+comparison = manager.compare_strategies(
+    scores,
+    correlation_analyzer=corr_analyzer,
+    num_iterations=20
+)
+
+print(f"Estándar - Score promedio: {comparison['standard']['avg_score']:.4f}")
+print(f"Condicional - Score promedio: {comparison['conditional']['avg_score']:.4f}")
+print(f"Condicional - Correlation Score: {comparison['conditional']['avg_correlation_score']:.4f}")
+
+
+SWITCH ENTRE MÉTODOS (Preparado para GUI):
+
+# Usuario selecciona método
+manager.set_strategy(GenerationStrategy.STANDARD)
+result = manager.generate(scores)
+
+# Usuario cambia a condicional
+manager.set_strategy(GenerationStrategy.CONDITIONAL)
+result = manager.generate(scores, correlation_analyzer=corr_analyzer)
+
+
+================================================================================
+⚙️ CONFIGURACIÓN AVANZADA
+================================================================================
+
+AJUSTE DE PESOS
+--------------------------------------------------------------------------------
+
+Los pesos controlan cómo se combinan diferentes métricas para calcular scores.
+
+PESOS POR DEFECTO:
+
+  pesos = {
+      'peso_frecuencia': 0.35,           # Frecuencia histórica total
+      'peso_frecuencia_reciente': 0.25,  # Frecuencia últimos N sorteos  
+      'peso_ciclo': 0.15,                # Ciclo de aparición esperado
+      'peso_latencia': 0.15,             # Tiempo desde última aparición
+      'peso_tendencia': 0.10,            # Tendencia (aceleración/desaceleración)
+  }
+
+  ⚠️ La suma de todos los pesos debe ser 1.0
+
+
+USAR PERFILES PREDEFINIDOS:
+
+  from core.scoring import WeightManager
+
+  weight_manager = WeightManager()
+  
+  # Crear perfiles predeterminados
+  weight_manager.create_default_profiles()
+  
+  # Cargar un perfil
+  pesos = weight_manager.load_profile('balanced')
+  
+  # Usar los pesos en el scorer
+  scorer = UnifiedScorer(pesos)
+
+
+CREAR TU PROPIO PERFIL:
+
+  # Definir pesos personalizados
+  mis_pesos = {
+      'peso_frecuencia': 0.40,
+      'peso_frecuencia_reciente': 0.30,
+      'peso_ciclo': 0.15,
+      'peso_latencia': 0.10,
+      'peso_tendencia': 0.05,
+  }
+  
+  # Guardar el perfil
+  weight_manager.save_profile('mi_perfil', mis_pesos)
+
+
+CONFIGURACIÓN DE RESTRICCIONES
+--------------------------------------------------------------------------------
+
+Las restricciones mejoran la calidad de las combinaciones generadas.
+
+RESTRICCIONES POR DEFECTO:
+
+  restricciones = {
+      'min_pares': 2,              # Mínimo de números pares
+      'max_pares': 4,              # Máximo de números pares
+      'min_consecutivos': 0,       # Mínimo de consecutivos
+      'max_consecutivos': 2,       # Máximo de consecutivos
+      'suma_min': 60,              # Suma mínima de la combinación
+      'suma_max': 200,             # Suma máxima de la combinación
+      'rango_bajo': (0, 15),       # Definición de números bajos
+      'rango_medio': (16, 30),     # Definición de números medios
+      'rango_alto': (31, 45),      # Definición de números altos
+      'min_por_rango': 1,          # Mínimo 1 número de cada rango
+  }
+
+
+ACTUALIZAR RESTRICCIONES:
+
+  generator = CombinationGenerator()
+  
+  nuevas_restricciones = {
+      'min_pares': 3,
+      'max_consecutivos': 1,
+      'suma_min': 80,
+      'suma_max': 180
+  }
+  
+  generator.update_constraints(nuevas_restricciones)
+
+
+PARÁMETROS DE BACKTESTING
+--------------------------------------------------------------------------------
+
+  from core.backtesting import Backtester
+  
+  backtester = Backtester(test_size=20)  # Últimos 20 sorteos para test
+  
+  summary = backtester.run_backtest(
+      data, 
+      weights=pesos,
+      generate_n_combinations=1  # Cuántas combinaciones generar por sorteo
+  )
+
+
+================================================================================
+🧬 OPTIMIZACIÓN CON ALGORITMOS GENÉTICOS
+================================================================================
+
+Para predicciones más sofisticadas, usa el optimizador genético:
+
+from core.generator import CombinationOptimizer
+
+optimizer = CombinationOptimizer()
+
+mejor_combinacion = optimizer.genetic_algorithm(
+    scores,
+    population_size=100,     # Tamaño de población
+    generations=50,          # Número de generaciones
+    mutation_rate=0.1,       # Tasa de mutación (0.0 - 1.0)
+    elite_size=10           # Cantidad de elite a preservar
+)
+
+print(f"Combinación optimizada: {mejor_combinacion}")
+
+
+PARÁMETROS DEL ALGORITMO GENÉTICO:
+
+- population_size: Cuántos individuos en cada generación (más = mejor búsqueda)
+- generations: Cuántas generaciones evolucionar (más = mejor convergencia)
+- mutation_rate: Probabilidad de mutación (0.1 = 10%)
+- elite_size: Mejores individuos que pasan sin cambios a siguiente generación
+
+
+================================================================================
+📊 ANÁLISIS INCLUIDOS
+================================================================================
+
+1. ANÁLISIS DE FRECUENCIAS
+--------------------------------------------------------------------------------
+   - Frecuencia absoluta: Cuántas veces apareció cada número
+   - Frecuencia relativa: Normalizada (0-1)
+   - Números calientes: Más frecuentes en últimos N sorteos
+   - Números fríos: Menos frecuentes en últimos N sorteos
+   - Ciclos de aparición: Cada cuántos sorteos aparece en promedio
+   - Latencia: Cuántos sorteos han pasado desde última aparición
+   - Tendencia: Si el número está acelerando o desacelerando
+
+2. ANÁLISIS DE PATRONES
+--------------------------------------------------------------------------------
+   - Rachas: Apariciones consecutivas
+   - Sequías: Ausencias consecutivas
+   - Patrones mensuales: Números más frecuentes por mes
+   - Estacionalidad: Tendencias según época del año
+
+3. ANÁLISIS DE CORRELACIONES
+--------------------------------------------------------------------------------
+   - Pares frecuentes: Números que salen juntos
+   - Tripletas recurrentes: Grupos de 3 que coinciden
+   - Anti-correlaciones: Números que raramente salen juntos
+   - Compañeros favorables: Para cada número, cuáles salen con él
+
+
+================================================================================
+📈 MÉTRICAS Y REPORTES
+================================================================================
+
+USAR EL EVALUADOR DE RENDIMIENTO:
+
+from core.backtesting import PerformanceEvaluator
+
+evaluator = PerformanceEvaluator()
+
+# Agregar predicciones
+evaluator.add_prediction(prediccion, resultado_real)
+evaluator.add_prediction(prediccion2, resultado_real2)
+# ... más predicciones
+
+# Calcular métricas
+metrics = evaluator.calculate_metrics()
+
+# Ver reporte
+evaluator.print_report()
+
+# Exportar a JSON
+evaluator.export_metrics('resultados/metricas.json')
+
+
+COMPARAR DIFERENTES CONFIGURACIONES:
+
+backtester = Backtester(test_size=20)
+
+configs = [
+    {'name': 'Balanceado', 'weights': peso_balanceado},
+    {'name': 'Frecuencia', 'weights': peso_frecuencia},
+    {'name': 'Reciente', 'weights': peso_reciente}
+]
+
+weights_list = [c['weights'] for c in configs]
+names = [c['name'] for c in configs]
+
+comparison = backtester.compare_weights(data, weights_list, names)
+print(comparison)
+
+
+================================================================================
+🎨 CARACTERÍSTICAS DESTACADAS
+================================================================================
+
+✓ MODULAR Y EXTENSIBLE
+  - Arquitectura en capas bien definida
+  - Fácil agregar nuevos análisis o algoritmos
+  - Cada módulo es independiente
+
+✓ CONFIGURABLE
+  - Todos los parámetros son ajustables
+  - Perfiles guardables y cargables
+  - Sin valores hardcodeados
+
+✓ CIENTÍFICO
+  - Backtesting para validar hipótesis
+  - Métricas estadísticas rigurosas
+  - Comparación objetiva de configuraciones
+
+✓ PROFESIONAL
+  - Código limpio y documentado
+  - Manejo de errores
+  - Validaciones completas
+
+✓ COMPLETO
+  - Flujo end-to-end desde datos hasta predicción
+  - Múltiples estrategias de análisis
+  - Optimización avanzada
+
+
+================================================================================
+📝 EJEMPLO DE SALIDA DEL SISTEMA
+================================================================================
+
+Al ejecutar 'python ejemplo_uso.py', verás:
+
+===============================================================
+ CHARLY PREDICTOR - Sistema de Predicción de Quini 6
+===============================================================
+
+📂 PASO 1: Cargando datos históricos...
+---------------------------------------------------------------
+✓ Datos cargados: 200 sorteos
+  Rango: 2023-01-01 a 2024-09-11
+
+🔍 PASO 2: Validando y preprocesando datos...
+---------------------------------------------------------------
+✓ Datos validados y preprocesados
+
+📊 PASO 3: Ejecutando análisis estadísticos...
+---------------------------------------------------------------
+✓ Análisis de frecuencias completado
+  Top 5 números calientes: [12, 23, 34, 5, 41]
+  Top 5 números fríos: [8, 19, 27, 36, 44]
+✓ Análisis de patrones completado
+✓ Análisis de correlaciones completado
+  Par más frecuente: (12, 23) (aparece 15 veces)
+
+🎯 PASO 4: Calculando scores con sistema de ponderación...
+---------------------------------------------------------------
+✓ Scores calculados para todos los números
+
+  Top 10 números por score:
+     1. Número 12 - Score: 0.9234
+     2. Número 23 - Score: 0.8891
+     3. Número 34 - Score: 0.8567
+     ...
+
+🎲 PASO 5: Generando combinaciones candidatas...
+---------------------------------------------------------------
+  Combinación simple (top 6): [5, 12, 23, 34, 38, 41]
+  Combinación con restricciones: [7, 12, 23, 28, 34, 42]
+    - Suma: 146
+    - Pares/Impares: 4/2
+    - Consecutivos: 0
+    - Distribución: Bajos=1, Medios=3, Altos=2
+
+  Portfolio de 5 combinaciones generado
+
+✅ PASO 6: Ejecutando backtesting...
+---------------------------------------------------------------
+[Resultados del backtesting con métricas detalladas]
+
+🔮 PASO 7: Generando predicción final para próximo sorteo...
+---------------------------------------------------------------
+
+  🎯 PREDICCIÓN FINAL (Optimizada): [6, 13, 22, 31, 37, 44]
+
+  Características de la predicción:
+    - Suma total: 153
+    - Pares: 3, Impares: 3
+    - Consecutivos: 0
+    - Score promedio: 0.7845
+    - Cumple restricciones: ✓ Sí
+
+  📋 Top 3 combinaciones alternativas:
+    1. [5, 12, 23, 29, 34, 41]
+    2. [7, 14, 22, 28, 35, 43]
+    3. [9, 16, 24, 30, 38, 42]
+
+
+================================================================================
+⚠️ CONSIDERACIONES IMPORTANTES
+================================================================================
+
+ESTE SISTEMA ES PARA ANÁLISIS ESTADÍSTICO Y APRENDIZAJE:
+
+❌ El Quini 6 es un sistema completamente aleatorio
+❌ NO HAY forma de predecir con certeza los resultados
+❌ Los patrones del pasado NO garantizan resultados futuros
+
+✅ Este sistema permite explorar patrones estadísticos
+✅ Útil para aprender sobre probabilidades, ML y análisis de datos
+✅ Las predicciones son probabilísticas, NO garantías
+
+
+USO RESPONSABLE:
+--------------------------------------------------------------------------------
+- No inviertas más de lo que puedes permitirte perder
+- El juego debe ser recreativo, no una inversión
+- Conoce las probabilidades reales del Quini 6
+- Este es un proyecto educativo y de aprendizaje
+
+
+PROBABILIDADES REALES DEL QUINI 6:
+--------------------------------------------------------------------------------
+- Total de combinaciones posibles: 9,366,819
+- Probabilidad de acertar 6 números: 1 en 9,366,819 (0.00001068%)
+- Probabilidad de acertar 5 números: ~0.0002%
+- Probabilidad de acertar 4 números: ~0.01%
+- Probabilidad de acertar 3 números: ~0.3%
+
+
+================================================================================
+🔮 PRÓXIMAS MEJORAS (ROADMAP)
+================================================================================
+
+PLANEADAS PARA FUTURAS VERSIONES:
+
+[ ] Modelos de Machine Learning
+    - Random Forest para scoring de números
+    - Redes neuronales LSTM para series temporales
+    - Gradient Boosting para clasificación
+
+[ ] Optimización de Hiperparámetros
+    - Grid Search automático
+    - Random Search
+    - Bayesian Optimization
+    - Algoritmos genéticos para optimizar pesos
+
+[ ] Interfaz Gráfica (GUI)
+    - Dashboard interactivo
+    - Visualización de estadísticas
+    - Generación de predicciones con un clic
+    - Gestión de perfiles de pesos
+
+[ ] API REST
+    - Endpoints para predicciones
+    - Servicio web deployable
+    - Documentación Swagger
+
+[ ] Visualizaciones
+    - Gráficos de frecuencias
+    - Heatmaps de correlaciones
+    - Líneas de tendencia
+    - Distribuciones
+
+[ ] Base de Datos SQL
+    - PostgreSQL para datos históricos
+    - Historial de predicciones
+    - Cache de resultados
+
+[ ] Análisis Adicionales
+    - Teoría de grafos (relaciones entre números)
+    - Análisis de componentes principales (PCA)
+    - Clustering de combinaciones similares
+
+
+================================================================================
+🛠️ TROUBLESHOOTING
+================================================================================
+
+PROBLEMA: Error al importar módulos
+SOLUCIÓN: 
+  - Verifica que estés en el directorio correcto
+  - Ejecuta: python test_instalacion.py
+
+PROBLEMA: "No se encontró archivo CSV"
+SOLUCIÓN:
+  - Genera datos de muestra: python utils/data_generator.py
+  - O coloca tu archivo CSV en: data/quini6_historico.csv
+
+PROBLEMA: "No hay suficientes datos para backtesting"
+SOLUCIÓN:
+  - Se requieren mínimo 120 sorteos históricos
+  - Reduce test_size en Backtester(test_size=10)
+
+PROBLEMA: Combinación no cumple restricciones
+SOLUCIÓN:
+  - Las restricciones pueden ser muy estrictas
+  - Ajusta los valores en COMBINATION_CONSTRAINTS
+  - O usa generate_simple() sin restricciones
+
+
+================================================================================
+📚 DOCUMENTACIÓN DE ARCHIVOS CLAVE
+================================================================================
+
+core/config.py
+  - Configuración global del sistema
+  - Parámetros del Quini 6 (rango de números, etc.)
+  - Pesos por defecto
+  - Restricciones de combinaciones
+
+core/data/loader.py
+  - DataLoader: Carga datos desde CSV, JSON o listas
+  - Métodos: load_csv(), load_json(), load_from_list()
+
+core/data/validator.py
+  - DataValidator: Valida integridad de datos
+  - Detecta errores y advertencias
+  - Método clean_data() para limpiar automáticamente
+
+core/data/preprocessor.py
+  - DataPreprocessor: Calcula features adicionales
+  - Features: suma, pares, impares, consecutivos, primos, etc.
+
+core/analysis/frequency.py
+  - FrequencyAnalyzer: Análisis de frecuencias completo
+  - Método analyze() ejecuta todos los análisis
+  - get_scores() retorna scores por número
+
+core/scoring/scorer.py
+  - UnifiedScorer: Sistema de scoring unificado
+  - calculate_scores() combina múltiples métricas
+  - get_top_numbers() retorna mejores números
+
+core/generator/combination.py
+  - CombinationGenerator: Genera combinaciones
+  - generate_with_constraints() aplica restricciones
+  - generate_portfolio() crea portfolio diverso
+
+core/generator/optimizer.py
+  - CombinationOptimizer: Algoritmos de optimización
+  - genetic_algorithm() evoluciona combinaciones
+  - monte_carlo_search() búsqueda aleatoria
+
+core/backtesting/backtester.py
+  - Backtester: Validación con datos históricos
+  - run_backtest() ejecuta validación completa
+  - compare_weights() compara configuraciones
+
+
+================================================================================
+💡 TIPS Y MEJORES PRÁCTICAS
+================================================================================
+
+1. EMPIEZA SIMPLE
+   - Usa primero generate_simple() para familiarizarte
+   - Luego agrega restricciones gradualmente
+
+2. AJUSTA PESOS GRADUALMENTE
+   - Comienza con el perfil 'balanced'
+   - Ajusta un peso a la vez
+   - Usa backtesting para medir el impacto
+
+3. USA BACKTESTING SIEMPRE
+   - Valida cualquier cambio de configuración
+   - Compara resultados objetivamente
+   - No confíes solo en la intuición
+
+4. EXPERIMENTA CON RESTRICCIONES
+   - Analiza las combinaciones ganadoras históricas
+   - Identifica patrones comunes
+   - Ajusta restricciones basándote en datos reales
+
+5. MANTÉN MUCHOS DATOS HISTÓRICOS
+   - Más datos = mejores estadísticas
+   - Recomendado: mínimo 200 sorteos
+   - Ideal: 500+ sorteos
+
+6. GENERA PORTFOLIOS, NO UNA SOLA COMBINACIÓN
+   - Mayor cobertura de números
+   - Diversificación de riesgo
+   - Más oportunidades de aciertos parciales
+
+7. DOCUMENTA TUS EXPERIMENTOS
+   - Guarda perfiles de pesos que funcionan
+   - Anota qué configuraciones probaste
+   - Registra resultados para comparar
+
+
+================================================================================
+✅ LISTO PARA PROBAR
+================================================================================
+
+EJECUTA:
+  py -m pip install -r requirements.txt
+
+  python test_instalacion.py
+
+Si todos los tests pasan, tu sistema está listo para usar.
+
+Luego ejecuta el ejemplo completo:
+
+  python ejemplo_uso.py
+
+¡Explora, experimenta y ajusta el sistema a tus necesidades!
+
+
+================================================================================
+📧 SOPORTE Y CONTRIBUCIONES
+================================================================================
+
+Este es un proyecto de código abierto y educativo.
+
+- Puedes modificarlo libremente
+- Puedes agregar tus propios análisis
+- Puedes compartir mejoras
+
+Recuerda: Úsalo de forma responsable y con fines educativos.
+
+
+================================================================================
+FIN DE LA GUÍA COMPLETA
+Versión: 1.0.0
+Fecha: Febrero 2026
+================================================================================
