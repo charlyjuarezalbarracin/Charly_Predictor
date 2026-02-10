@@ -1,6 +1,11 @@
 """
 Test del sistema de estrategias de generación
 Prueba ambos métodos: Estándar y Condicional
+
+BACKTESTING REAL:
+- Usa datos históricos hasta sorteo 412 (2026-02-04)
+- Predice los 4 sorteos del 2026-02-08 (sorteos 413-416)
+- Compara predicciones vs resultados reales
 """
 
 import sys
@@ -14,6 +19,171 @@ from core.analysis import FrequencyAnalyzer, CorrelationAnalyzer
 from core.scoring import UnifiedScorer
 from core.generator import StrategyManager, GenerationStrategy, ConditionalGenerator
 from utils.data_generator import generate_sample_data
+
+
+def test_backtesting_real():
+    """
+    TEST DE BACKTESTING REAL CON DATOS DEL 2026-02-08
+    
+    Objetivo: Predecir los 4 sorteos reales usando datos históricos
+    
+    Sorteos a predecir (2026-02-08):
+    - Sorteo 413: [23, 44, 45, 18, 40, 24]
+    - Sorteo 414: [2, 0, 38, 13, 12, 25]
+    - Sorteo 415: [39, 21, 4, 17, 20, 37]
+    - Sorteo 416: [23, 4, 32, 37, 38, 7]
+    """
+    print("\n" + "="*80)
+    print(" TEST BACKTESTING REAL - Predicción 2026-02-08")
+    print("="*80)
+    
+    # RESULTADOS REALES A PREDECIR
+    RESULTADOS_REALES = [
+        {'sorteo_id': 413, 'fecha': '2026-02-08', 'numeros': [23, 44, 45, 18, 40, 24]},
+        {'sorteo_id': 414, 'fecha': '2026-02-08', 'numeros': [2, 0, 38, 13, 12, 25]},
+        {'sorteo_id': 415, 'fecha': '2026-02-08', 'numeros': [39, 21, 4, 17, 20, 37]},
+        {'sorteo_id': 416, 'fecha': '2026-02-08', 'numeros': [23, 4, 32, 37, 38, 7]},
+    ]
+    
+    try:
+        # 1. Cargar datos históricos (hasta sorteo 412)
+        print("\n1. Cargando datos históricos...")
+        loader = DataLoader()
+        
+        try:
+            # Cargar CSV completo
+            data_full = loader.load_csv('data/quini6_historico_test.csv')
+            
+            # Filtrar solo hasta sorteo 412 (excluir los 4 últimos para test)
+            data = data_full[data_full['sorteo_id'] <= 412].copy()
+            
+            print(f"   ✓ Datos cargados: {len(data)} sorteos")
+            print(f"   ✓ Rango: {data['fecha'].min()} a {data['fecha'].max()}")
+            print(f"   ✓ Último sorteo: {data['sorteo_id'].max()}")
+            
+        except Exception as e:
+            print(f"   ✗ Error al cargar CSV: {e}")
+            print("   Usando datos de ejemplo...")
+            sorteos = generate_sample_data(num_sorteos=200)
+            data = loader.load_from_list(sorteos)
+        
+        # 2. Análisis completo
+        print("\n2. Ejecutando análisis estadísticos...")
+        freq_analyzer = FrequencyAnalyzer()
+        freq_analyzer.analyze(data)
+        
+        corr_analyzer = CorrelationAnalyzer()
+        corr_analyzer.analyze(data)
+        
+        scorer = UnifiedScorer()
+        scores = scorer.calculate_scores(freq_analyzer)
+        print("   ✓ Análisis completado")
+        
+        # 3. Crear manager
+        print("\n3. Preparando sistema de predicción...")
+        manager = StrategyManager()
+        print("   ✓ Sistema listo")
+        
+        # 4. Generar predicciones para cada sorteo
+        print("\n" + "="*80)
+        print(" GENERANDO PREDICCIONES Y COMPARANDO CON RESULTADOS REALES")
+        print("="*80)
+        
+        resultados_test = []
+        
+        for i, resultado_real in enumerate(RESULTADOS_REALES, 1):
+            print(f"\n{'─'*80}")
+            print(f"SORTEO {resultado_real['sorteo_id']} - {resultado_real['fecha']}")
+            print(f"{'─'*80}")
+            
+            # Generar predicción con ambos métodos
+            predicciones = manager.generate_side_by_side(scores, corr_analyzer)
+            
+            pred_standard = sorted(predicciones['standard'])
+            pred_conditional = sorted(predicciones['conditional'])
+            real = sorted(resultado_real['numeros'])
+            
+            # Calcular aciertos
+            aciertos_std = len(set(pred_standard) & set(real))
+            aciertos_cond = len(set(pred_conditional) & set(real))
+            
+            print(f"\nResultado REAL:          {real}")
+            print(f"Predicción ESTÁNDAR:     {pred_standard}  → {aciertos_std}/6 aciertos")
+            print(f"Predicción CONDICIONAL:  {pred_conditional}  → {aciertos_cond}/6 aciertos")
+            
+            # Mostrar números acertados
+            if aciertos_std > 0:
+                acertados_std = set(pred_standard) & set(real)
+                print(f"  ✓ Estándar acertó: {sorted(acertados_std)}")
+            
+            if aciertos_cond > 0:
+                acertados_cond = set(pred_conditional) & set(real)
+                print(f"  ✓ Condicional acertó: {sorted(acertados_cond)}")
+            
+            # Guardar resultados
+            resultados_test.append({
+                'sorteo': resultado_real['sorteo_id'],
+                'real': real,
+                'pred_standard': pred_standard,
+                'pred_conditional': pred_conditional,
+                'aciertos_standard': aciertos_std,
+                'aciertos_conditional': aciertos_cond,
+            })
+        
+        # 5. Resumen estadístico
+        print("\n" + "="*80)
+        print(" RESUMEN DEL BACKTESTING")
+        print("="*80)
+        
+        total_sorteos = len(resultados_test)
+        total_aciertos_std = sum(r['aciertos_standard'] for r in resultados_test)
+        total_aciertos_cond = sum(r['aciertos_conditional'] for r in resultados_test)
+        
+        promedio_std = total_aciertos_std / total_sorteos
+        promedio_cond = total_aciertos_cond / total_sorteos
+        
+        print(f"\nTotal de sorteos evaluados: {total_sorteos}")
+        print(f"\nMÉTODO ESTÁNDAR:")
+        print(f"  - Total aciertos: {total_aciertos_std}/{total_sorteos * 6}")
+        print(f"  - Promedio: {promedio_std:.2f} aciertos por sorteo")
+        print(f"  - Porcentaje: {(promedio_std/6)*100:.1f}%")
+        
+        print(f"\nMÉTODO CONDICIONAL:")
+        print(f"  - Total aciertos: {total_aciertos_cond}/{total_sorteos * 6}")
+        print(f"  - Promedio: {promedio_cond:.2f} aciertos por sorteo")
+        print(f"  - Porcentaje: {(promedio_cond/6)*100:.1f}%")
+        
+        # Mejor método
+        if promedio_std > promedio_cond:
+            print(f"\n🏆 GANADOR: Método ESTÁNDAR (+{promedio_std - promedio_cond:.2f} aciertos)")
+        elif promedio_cond > promedio_std:
+            print(f"\n🏆 GANADOR: Método CONDICIONAL (+{promedio_cond - promedio_std:.2f} aciertos)")
+        else:
+            print(f"\n🤝 EMPATE: Ambos métodos igual de efectivos")
+        
+        # Chequear si alguno acertó 6/6
+        sorteos_6_std = [r for r in resultados_test if r['aciertos_standard'] == 6]
+        sorteos_6_cond = [r for r in resultados_test if r['aciertos_conditional'] == 6]
+        
+        if sorteos_6_std:
+            print(f"\n🎰 ¡PREMIO MAYOR! Estándar acertó 6/6 en sorteo(s): {[r['sorteo'] for r in sorteos_6_std]}")
+        
+        if sorteos_6_cond:
+            print(f"\n🎰 ¡PREMIO MAYOR! Condicional acertó 6/6 en sorteo(s): {[r['sorteo'] for r in sorteos_6_cond]}")
+        
+        print("\n" + "="*80)
+        
+        # Validación básica
+        assert len(resultados_test) == 4, "Deben evaluarse 4 sorteos"
+        
+        print("\n✅ TEST BACKTESTING REAL COMPLETADO\n")
+        return True
+        
+    except Exception as e:
+        print(f"\n❌ TEST BACKTESTING FALLIDO: {e}\n")
+        import traceback
+        traceback.print_exc()
+        return False
 
 
 def test_conditional_generator():
@@ -323,6 +493,9 @@ def run_all_tests():
     print("="*80)
     
     results = []
+    
+    # Test 0: BACKTESTING REAL (PRINCIPAL)
+    results.append(("🎯 BACKTESTING REAL 2026-02-08", test_backtesting_real()))
     
     # Test 1: Generador Condicional
     results.append(("Generador Condicional", test_conditional_generator()))

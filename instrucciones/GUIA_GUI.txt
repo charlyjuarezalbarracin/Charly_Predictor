@@ -1,0 +1,311 @@
+================================================================================
+  GUÍA DE LA INTERFAZ GRÁFICA - CHARLY PREDICTOR
+================================================================================
+
+🎨 TECNOLOGÍA UTILIZADA: Streamlit
+================================================================================
+
+¿Por qué Streamlit?
+  ✅ Diseño moderno y claro por defecto
+  ✅ Componentes profesionales ya incluidos
+  ✅ Gráficos interactivos con Plotly
+  ✅ No requiere HTML/CSS/JavaScript
+  ✅ Responsive (se adapta a cualquier pantalla)
+  ✅ Desarrollo rápido y eficiente
+
+
+================================================================================
+📦 INSTALACIÓN (PRIMERA VEZ)
+================================================================================
+
+PASO 1: Instalar nuevas dependencias
+--------------------------------------------------------------------------------
+
+WINDOWS:
+  py -m pip install streamlit plotly
+
+LINUX/MAC:
+  python -m pip install streamlit plotly
+
+O usar archivo de requirements:
+  py -m pip install -r requirements.txt
+
+
+PASO 2: Verificar instalación
+--------------------------------------------------------------------------------
+
+  streamlit --version
+
+Debe mostrar algo como: Streamlit, version 1.28.0
+
+
+================================================================================
+🚀 EJECUTAR LA APLICACIÓN
+================================================================================
+
+COMANDO PRINCIPAL:
+--------------------------------------------------------------------------------
+
+WINDOWS:
+  streamlit run app_gui.py
+
+LINUX/MAC:
+  streamlit run app_gui.py
+
+
+QUÉ SUCEDE:
+  1. Se abre automáticamente en tu navegador
+  2. URL: http://localhost:8501
+  3. La aplicación queda corriendo en la terminal
+  4. Para detener: Ctrl+C en la terminal
+
+
+SI NO SE ABRE AUTOMÁTICAMENTE:
+  Abre manualmente: http://localhost:8501
+
+
+================================================================================
+🎯 CARACTERÍSTICAS DE LA GUI
+================================================================================
+
+PANEL LATERAL (Sidebar):
+--------------------------------------------------------------------------------
+  📂 Datos
+    • Opción: Usar datos reales (CSV) o generar muestra
+    • Botón para cargar archivo CSV
+    • Slider para cantidad de sorteos de muestra
+    • Botón "Cargar Datos" / "Generar Datos de Muestra"
+  
+  🎯 Método de Predicción
+    • Dropdown para elegir: Estándar / Condicional / Ambos
+    • Slider de peso de correlaciones (0.0 - 1.0)
+  
+  ℹ️ Información
+    • Número de sorteos cargados
+    • Cantidad de predicciones generadas
+
+
+ÁREA PRINCIPAL:
+--------------------------------------------------------------------------------
+
+PESTAÑA 1: 🎯 PREDICCIÓN
+  • Botón grande "GENERAR PREDICCIÓN"
+  • Números predichos en tarjetas grandes y coloridas
+  • Métricas: Score, Suma, Pares/Impares, Consecutivos
+  • Si elige "Ambos": muestra comparación lado a lado
+  • Código copiable de los números
+  • Consejos y tips
+
+PESTAÑA 2: 📊 ANÁLISIS
+  • Top 10 números calientes (con scores más altos)
+  • Top 10 números fríos (con scores más bajos)
+  • Tabla de pares más frecuentes
+  • Datos en tablas interactivas
+
+PESTAÑA 3: 📈 GRÁFICOS
+  • Gráfico de barras: Frecuencias de números
+  • Gráfico de barras: Scores calculados
+  • Matriz de calor: Correlaciones entre números
+  • Todos los gráficos son interactivos (zoom, pan, descarga)
+
+PESTAÑA 4: 📜 HISTORIAL
+  • Lista de todas las predicciones generadas
+  • Timestamp de cada predicción
+  • Método usado y score obtenido
+  • Botón para copiar números
+  • Botón para limpiar historial
+
+
+================================================================================
+🎨 DISEÑO Y TEMA
+================================================================================
+
+TEMA: Claro y Moderno
+  • Fondo: Blanco/gris claro (#f8f9fa)
+  • Tarjetas: Blancas con sombras suaves
+  • Números predichos: Gradiente morado llamativo
+  • Botones: Redondeados con efectos modernos
+  • Tipografía: Arial, clean y profesional
+
+COLORES PRINCIPALES:
+  • Primario: #667eea (azul-morado)
+  • Secundario: #764ba2 (morado)
+  • Texto: #1f2937 (gris oscuro)
+  • Fondo: #f8f9fa (gris muy claro)
+
+ELEMENTOS INTERACTIVOS:
+  • Sliders con valores en tiempo real
+  • Dropdowns estilizados
+  • Gráficos con zoom, pan, descarga
+  • Botones con efectos hover
+  • Expanders para historial
+
+
+================================================================================
+📋 FLUJO DE USO TÍPICO
+================================================================================
+
+1. INICIAR LA APLICACIÓN
+   streamlit run app_gui.py
+   
+2. CARGAR DATOS
+   Opción A: Subir CSV real
+     • Click en "Browse files"
+     • Seleccionar archivo
+     • Click "Cargar Datos"
+   
+   Opción B: Generar muestra
+     • Seleccionar "Generar datos de muestra"
+     • Ajustar cantidad (slider)
+     • Click "Generar Datos de Muestra"
+
+3. CONFIGURAR MÉTODO
+   • Elegir método en dropdown
+   • Ajustar peso de correlaciones (si es condicional)
+
+4. GENERAR PREDICCIÓN
+   • Click en botón "GENERAR PREDICCIÓN"
+   • Ver números predichos
+   • Revisar métricas
+
+5. EXPLORAR ANÁLISIS
+   • Ir a pestaña "Análisis" para ver estadísticas
+   • Ir a "Gráficos" para visualizaciones
+   • Ver "Historial" para predicciones anteriores
+
+6. GENERAR MÁS PREDICCIONES
+   • Repetir paso 4 las veces que quieras
+   • Cambiar método y comparar
+   • Todo se guarda en el historial
+
+
+================================================================================
+⚙️ PERSONALIZACIÓN
+================================================================================
+
+CAMBIAR COLORES:
+  Editar app_gui.py líneas 34-100 (sección CSS)
+
+AJUSTAR LAYOUT:
+  Modificar layout="wide" a layout="centered" (línea 26)
+
+CAMBIAR CANTIDAD DE HISTORIAL:
+  Línea 249: Cambiar 20 a otro número
+
+MODIFICAR GRÁFICOS:
+  Funciones graficar_* (líneas 260-370)
+
+
+================================================================================
+🔧 TROUBLESHOOTING
+================================================================================
+
+PROBLEMA: Error al importar módulos del core
+SOLUCIÓN: Asegúrate de ejecutar desde la carpeta raíz del proyecto
+
+PROBLEMA: No carga el archivo CSS
+SOLUCIÓN: Normal en Streamlit, el CSS está embebido en el código
+
+PROBLEMA: Los gráficos no se ven
+SOLUCIÓN: Instala plotly: py -m pip install plotly
+
+PROBLEMA: "Address already in use"
+SOLUCIÓN: 
+  streamlit run app_gui.py --server.port 8502
+
+PROBLEMA: Cambios no se reflejan
+SOLUCIÓN: Streamlit auto-recarga. Si no funciona, refresca el navegador
+
+
+================================================================================
+💡 TIPS Y TRUCOS
+================================================================================
+
+1. MODO DESARROLLO
+   • Los cambios se recargan automáticamente
+   • Si modificas app_gui.py, Streamlit lo detecta
+   • Click en "Rerun" en el navegador
+
+2. TEMA OSCURO (si lo prefieres)
+   • Click en menú (☰) arriba derecha
+   • Settings → Theme → Dark
+   
+3. MODO PANTALLA COMPLETA
+   • Presiona F11 en el navegador
+
+4. EXPORTAR GRÁFICOS
+   • Hover sobre gráfico
+   • Click en ícono de cámara
+   • Se descarga como PNG
+
+5. COPIAR NÚMEROS RÁPIDO
+   • Los números aparecen en formato código
+   • Click para seleccionar
+   • Ctrl+C para copiar
+
+6. EJECUTAR EN PUERTO DIFERENTE
+   streamlit run app_gui.py --server.port 8080
+
+
+================================================================================
+🌐 COMPARTIR LA APLICACIÓN
+================================================================================
+
+OPCIÓN 1: Local Network (LAN)
+  streamlit run app_gui.py --server.address 0.0.0.0
+  
+  Otros en tu red pueden acceder con:
+  http://TU_IP:8501
+
+OPCIÓN 2: Deploy en Streamlit Cloud (GRATIS)
+  1. Sube el proyecto a GitHub
+  2. Ve a: share.streamlit.io
+  3. Conecta tu repo
+  4. Deploy!
+  
+  Tu app estará en: https://tu-app.streamlit.app
+
+OPCIÓN 3: Deploy en servidor propio
+  • Heroku
+  • AWS
+  • Google Cloud
+  • Azure
+
+
+================================================================================
+📊 PRÓXIMAS MEJORAS POSIBLES
+================================================================================
+
+FEATURES ADICIONALES:
+  [ ] Exportar predicciones a Excel
+  [ ] Guardar configuraciones favoritas
+  [ ] Modo comparación de hasta 5 métodos
+  [ ] Gráfico de evolución temporal de números
+  [ ] Predicción múltiple (generar 10 jugadas)
+  [ ] Sistema de favoritos
+  [ ] Notificaciones de nuevos sorteos
+  [ ] Integración con API de resultados oficiales
+  [ ] Análisis de tendencias semanales/mensuales
+  [ ] Dashboard de estadísticas globales
+
+
+================================================================================
+✅ CHECKLIST DE VERIFICACIÓN
+================================================================================
+
+Antes de usar la GUI, verifica:
+
+  [✓] Python 3.8+ instalado
+  [✓] Dependencias instaladas (streamlit, plotly)
+  [✓] En la carpeta correcta (Charly_Predictor/)
+  [✓] Archivo app_gui.py existe
+  [✓] Módulos core/ disponibles
+  
+Para ejecutar:
+  [✓] Terminal abierta en carpeta del proyecto
+  [✓] Comando: streamlit run app_gui.py
+  [✓] Navegador abierto en http://localhost:8501
+  [✓] ¡Listo para usar!
+
+
+================================================================================

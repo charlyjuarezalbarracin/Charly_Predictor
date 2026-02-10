@@ -1,0 +1,50 @@
+# Reglas de Desarrollo - Charly Predictor
+
+## Preferencias Generales
+- NO agregar emojis ni íconos a botones, labels o textos de UI
+- NO crear archivos markdown para documentar cada cambio o resumir trabajo
+- PREGUNTAR antes de implementar cambios para validar que se entendió bien (a menos que el usuario diga "hazlo" o "listo")
+- Usar `multi_replace_string_in_file` cuando haya múltiples edits independientes
+- Respuestas concisas y directas
+
+## Datos
+- Usar SIEMPRE datos reales del CSV (`data/quini6_historico.csv`)
+- NO ofrecer opción de datos de muestra en la interfaz
+- Mantener fallback a datos de muestra solo internamente por si falla el CSV
+
+## Configuración Optimizada
+- Usar siempre OPTIMAL_WEIGHTS de `configs/config_optimizada.py`
+- Pesos óptimos:
+  - peso_frecuencia: 0.25
+  - peso_frecuencia_reciente: 0.25
+  - peso_ciclo: 0.25
+  - peso_latencia: 0.00 (eliminado - mejora rendimiento)
+  - peso_tendencia: 0.25
+- Estrategia óptima: BOTH
+
+## Estructura del Proyecto
+- `/core` - Módulos principales (data, analysis, scoring, generator, backtesting)
+- `/configs` - Configuraciones optimizadas
+- `/data` - CSVs históricos
+- `/tests` - Tests de estrategias y optimización
+- `/varios` - Scraper QuiniYa
+- `app.py` - Interfaz web Streamlit
+
+## Testing
+- Dataset: 412 sorteos (hasta 2026-02-04)
+- Test set: Sorteos 413-416 (2026-02-08)
+- Mejor rendimiento: 9/24 aciertos (2.25 por sorteo)
+- 130+ configuraciones probadas en 3 fases de optimización
+
+## Patrones de Código
+- Usar `st.cache_data` para funciones de carga/análisis
+- Limpiar cachés con `.clear()` al actualizar datos
+- Mantener código en español (comentarios, nombres de variables)
+- Preferir claridad sobre brevedad excesiva
+
+## UI Streamlit
+- Layout: wide
+- Tema: Midasmind (naranja #F2A100)
+- Mantener banner principal con logo
+- Panel lateral para configuración
+- Tabs para secciones principales

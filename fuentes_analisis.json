@@ -1,0 +1,68 @@
+[
+  {
+    "sitio": "Lotería de Buenos Aires (oficial)",
+    "url": "https://www.loteria.gba.gov.ar",
+    "status": 200,
+    "viable": true,
+    "indicios": [
+      "✓ Contiene \"sorteo\"",
+      "✓ 4 tabla(s) encontrada(s)",
+      "✓ 2 enlace(s) a sorteos"
+    ]
+  },
+  {
+    "sitio": "Quini 6 Resultados",
+    "url": "https://www.quini-6-resultados.com.ar",
+    "status": 200,
+    "viable": false
+  },
+  {
+    "sitio": "Tu Jugada",
+    "url": "https://www.tujugada.com.ar",
+    "status": 403,
+    "viable": false,
+    "error": "Protección anti-bot"
+  },
+  {
+    "sitio": "Lotería Nacional",
+    "url": "https://www.loterianacional.gob.ar",
+    "viable": false,
+    "error": "Sin conexión"
+  },
+  {
+    "sitio": "Loterias.com.ar",
+    "url": "https://www.loterias.com.ar/quini-6",
+    "viable": false,
+    "error": "Sin conexión"
+  },
+  {
+    "sitio": "ResultadosLoteria.com.ar",
+    "url": "https://www.resultadosloteria.com.ar/quini-6",
+    "viable": false,
+    "error": "Sin conexión"
+  },
+  {
+    "sitio": "LotoMagicas",
+    "url": "https://www.lotomagicas.com/quini6",
+    "viable": false,
+    "error": "Sin conexión"
+  },
+  {
+    "sitio": "Lotería Santa Fe",
+    "url": "https://www.loteriasycasinos.santafe.gob.ar",
+    "viable": false,
+    "error": "Sin conexión"
+  },
+  {
+    "sitio": "Lotería Córdoba",
+    "url": "https://www.loteriascordoba.com.ar",
+    "viable": false,
+    "error": "Sin conexión"
+  },
+  {
+    "sitio": "API Loterías Argentina (posible)",
+    "url": "https://api.loteriasargentinas.com.ar",
+    "viable": false,
+    "error": "Sin conexión"
+  }
+]
