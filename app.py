@@ -1519,16 +1519,26 @@ def main():
             "usando una ventana móvil de entrenamiento para validar la estabilidad de los pesos optimizados."
         )
         
+        # Calcular límites dinámicos basados en datos disponibles
+        data = st.session_state.current_data
+        total_sorteos = len(data)
+        
+        # Dejar margen para al menos 5-10 períodos de validación
+        # Fórmula: períodos = (total - train - test) / step
+        # Con test=10 y step=10, necesitamos: total - train - 60 > 0
+        max_train_window = max(100, total_sorteos - 100)
+        default_train_window = min(200, max_train_window - 50)
+        
         col_w1, col_w2, col_w3 = st.columns(3)
         
         with col_w1:
             ventana_train = st.number_input(
                 "Ventana de entrenamiento:",
                 min_value=100,
-                max_value=300,
-                value=200,
+                max_value=max_train_window,
+                value=default_train_window,
                 step=10,
-                help="Cantidad de sorteos para entrenar en cada periodo"
+                help=f"Cantidad de sorteos para entrenar en cada periodo (Disponibles: {total_sorteos})"
             )
         
         with col_w2:

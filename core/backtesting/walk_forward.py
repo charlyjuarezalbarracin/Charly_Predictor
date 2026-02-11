@@ -163,8 +163,8 @@ class WalkForwardBacktester:
         
         for _, test_row in test_data.iterrows():
             # Generar combinación
-            generator = CombinationGenerator(scores)
-            combination = generator.generate_combination(use_constraints=True)
+            generator = CombinationGenerator()
+            combination = generator.generate_with_constraints(scores)
             
             # Comparar con resultado real
             real_numbers = set(test_row['numeros'])
