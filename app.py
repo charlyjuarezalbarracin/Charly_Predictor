@@ -15,9 +15,10 @@ from pathlib import Path
 
 # Importaciones del core
 from core.data import DataLoader
-from core.analysis import FrequencyAnalyzer, CorrelationAnalyzer, PatternAnalyzer
+from core.analysis import FrequencyAnalyzer, CorrelationAnalyzer, PatternAnalyzer, AdaptiveWindowAnalyzer
 from core.scoring import UnifiedScorer
-from core.generator import StrategyManager, GenerationStrategy
+from core.generator import StrategyManager, GenerationStrategy, PortfolioGenerator
+from core.backtesting import WalkForwardBacktester
 from utils.data_generator import generate_sample_data
 from varios.scraper_quiniya_final import actualizar_historico_csv
 
@@ -147,16 +148,26 @@ st.markdown("""
     
     /* Tarjetas de números predichos - Estilo Midasmind */
     .numero-predicho {
-        background: white;
-        color: #333333;
+        background: linear-gradient(135deg, #F2A100 0%, #E58E00 100%);
+        color: white;
         padding: 16px 12px;
         border-radius: 20px;
         text-align: center;
         font-size: 24px;
         font-weight: 700;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-        margin: 6px;
-        border: 2px solid #F2A100;
+        box-shadow: 0 2px 8px rgba(242, 161, 0, 0.3);
+        margin: 0;
+        border: none;
+        width: 95px;
+    }
+    
+    /* Contenedor grid para números */
+    .numeros-grid {
+        display: grid;
+        grid-template-columns: repeat(6, 95px);
+        gap: 12px;
+        justify-content: flex-start;
+        margin: 20px 0;
     }
     
     /* Tarjetas de estadísticas */
@@ -487,11 +498,12 @@ st.markdown("""
     div[data-baseweb="notification"],
     .stAlertContainer {
         border-radius: 20px !important;
-        padding: 16px 20px !important;
+        padding: 10px 16px !important;
         border-width: 2px !important;
         border-style: solid !important;
-        font-size: 0.95rem !important;
+        font-size: 0.9rem !important;
         font-weight: 500 !important;
+        min-height: auto !important;
     }
     
     /* Success - Verde suave Midasmind */
@@ -631,8 +643,14 @@ st.markdown("""
     
     /* Ajustar columnas para resoluciones pequeñas */
     @media (max-width: 768px) {
+        .numeros-grid {
+            grid-template-columns: repeat(3, 90px);
+            gap: 10px;
+        }
+        
         .numero-predicho {
-            font-size: 18px;
+            width: 90px;
+            font-size: 20px;
             padding: 10px 6px;
         }
         
@@ -897,13 +915,110 @@ def mostrar_numeros_predichos(numeros, titulo="Predicción"):
     # Convertir a lista de enteros para manejar tipos numpy
     numeros_limpios = [int(n) for n in numeros]
     
-    cols = st.columns(6)
-    for i, num in enumerate(numeros_limpios):
-        with cols[i]:
-            st.markdown(
-                f'<div class="numero-predicho">{num:02d}</div>',
-                unsafe_allow_html=True
+    # Generar HTML con grid centrado
+    numeros_html = ''.join([f'<div class="numero-predicho">{num:02d}</div>' for num in numeros_limpios])
+    
+    st.markdown(
+        f'<div class="numeros-grid">{numeros_html}</div>',
+        unsafe_allow_html=True
+    )
+
+
+def mostrar_portfolio(portfolio, freq_analyzer, portfolio_gen, metodo_nombre):
+    """Muestra un portfolio de combinaciones generadas"""
+    st.markdown(f"### {len(portfolio)} Combinaciones Generadas")
+    
+    # Mostrar cada combinación
+    for idx, combo_data in enumerate(portfolio, 1):
+        st.markdown(f"**#{idx} {combo_data['nombre']}** - {combo_data['descripcion']}")
+        
+        # Números con indicador de momentum
+        numeros = combo_data['numeros']
+        momentum_results = freq_analyzer.results.get('momentum', {})
+        
+        # Generar HTML de números con momentum
+        numeros_html_parts = []
+        for num in numeros:
+            mom = momentum_results.get(num, 0)
+            if mom > 0.3:
+                indicador = "↑"
+            elif mom < -0.3:
+                indicador = "↓"
+            else:
+                indicador = ""
+            
+            numeros_html_parts.append(
+                f"<div style='text-align: center; padding: 12px 8px; "
+                f"background: linear-gradient(135deg, #F2A100 0%, #E58E00 100%); "
+                f"border-radius: 20px; width: 95px;'>"
+                f"<span style='font-size: 20px; font-weight: bold; color: white;'>{int(num):02d}</span>"
+                f"<span style='font-size: 12px; color: white;'> {indicador}</span>"
+                f"</div>"
             )
+        
+        st.markdown(
+            f'<div class="numeros-grid">{"".join(numeros_html_parts)}</div>',
+            unsafe_allow_html=True
+        )
+        
+        # Estadísticas compactas en una sola línea
+        suma = sum(numeros)
+        pares = sum(1 for n in numeros if n % 2 == 0)
+        momentum_text = f"Momentum: {combo_data['momentum_promedio']:+.2f}" if 'momentum_promedio' in combo_data else ""
+        
+        st.markdown(
+            f"<p style='margin: 15px 0 20px 0; font-size: 0.9rem; color: #666;'>"
+            f"Suma: {suma} &nbsp;&nbsp;&nbsp; "
+            f"Score: {combo_data['score_promedio']:.2f} &nbsp;&nbsp;&nbsp; "
+            f"Pares: {pares}/6 &nbsp;&nbsp;&nbsp; "
+            f"{momentum_text}"
+            f"</p>",
+            unsafe_allow_html=True
+        )
+        
+        # Agregar al historial
+        agregar_al_historial(
+            numeros,
+            f"Portfolio {metodo_nombre} - {combo_data['nombre']}",
+            {
+                'suma_total': suma,
+                'score_promedio': combo_data['score_promedio'],
+                'pares': pares,
+                'impares': 6 - pares,
+                'consecutivos': 0
+            }
+        )
+    
+    # Resumen de cobertura
+    coverage = portfolio_gen.analyze_portfolio_coverage(portfolio)
+    st.markdown("---")
+    st.markdown("### Análisis de Cobertura")
+    
+    st.markdown(
+        f"<div style='display: flex; gap: 40px; margin: 10px 0 15px 0;'>"
+        f"<div>"
+        f"<div style='color: #666; text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.5px; margin-bottom: 5px;'>NÚMEROS ÚNICOS TOTALES</div>"
+        f"<div style='color: #F2A100; font-size: 1.75rem; font-weight: 700;'>{coverage['numeros_unicos']}</div>"
+        f"</div>"
+        f"<div>"
+        f"<div style='color: #666; text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.5px; margin-bottom: 5px;'>SCORE DE DIVERSIFICACIÓN</div>"
+        f"<div style='color: #F2A100; font-size: 1.75rem; font-weight: 700;'>{coverage['diversificacion_score']:.2%}</div>"
+        f"</div>"
+        f"</div>",
+        unsafe_allow_html=True
+    )
+    
+    # Resumen para copiar
+    st.markdown("---")
+    
+    # Generar texto con todas las combinaciones
+    texto_copiar_lines = []
+    for idx, combo_data in enumerate(portfolio, 1):
+        nums_formatted = ', '.join([f"{int(n):02d}" for n in combo_data['numeros']])
+        texto_copiar_lines.append(f"#{idx} {combo_data['nombre']}: {nums_formatted}")
+    
+    texto_copiar = '\n'.join(texto_copiar_lines)
+    st.code(texto_copiar, language=None)
 
 
 # ============================================================================
@@ -952,7 +1067,7 @@ def main():
                 st.session_state.data_loaded = True
 
         # Actualizar desde QuiniYa
-        if st.button("Actualizar desde QuiniYa", width='stretch'):
+        if st.button("Actualizar datos desde QuiniYa", width='stretch'):
             with st.spinner("Actualizando datos desde QuiniYa..."):
                 try:
                     nuevos = actualizar_historico_csv('data/quini6_historico.csv')
@@ -981,7 +1096,7 @@ def main():
             "Ambos Métodos": GenerationStrategy.BOTH
         }
         
-        metodo_selected = st.selectbox(
+        metodo_selected = st.radio(
             "Selecciona el método:",
             list(metodo_options.keys()),
             index=2  # Por defecto "Ambos Métodos"
@@ -989,12 +1104,42 @@ def main():
         
         metodo = metodo_options[metodo_selected]
         
-        # 3. PARÁMETROS AVANZADOS
-        with st.expander("🔧 Parámetros Avanzados"):
-            st.markdown("#### Pesos de Scoring")
+        # 3. MULTI-COMBINACIONES
+        st.markdown("---")
+        st.markdown("### Generación Múltiple")
+        
+        usar_portfolio = st.checkbox(
+            "Generar múltiples combinaciones",
+            value=False,
+            help="Genera varias combinaciones usando diferentes estrategias"
+        )
+        
+        if usar_portfolio:
+            n_combinaciones = st.radio(
+                "Cantidad de combinaciones:",
+                options=[1, 2, 5, 10, 15, 20],
+                index=2,  # Default 5
+                help="Más combinaciones = mayor cobertura",
+                horizontal=True
+            )
+        else:
+            n_combinaciones = 1
+        
+        st.markdown("---")
+        
+        # 4. PARÁMETROS AVANZADOS
+        st.markdown("### Parámetros")
+        
+        with st.expander("Avanzados"):
+            st.markdown("#### Optimizaciones")
             
-            # Mostrar info de configuración optimizada
-            st.info("💡 Valores optimizados cargados automáticamente (2.25 aciertos/sorteo promedio)")
+            usar_ventanas_adaptativas = st.checkbox(
+                "Usar ventanas temporales adaptativas",
+                value=False,
+                help="Cada número usará la ventana temporal que mejor lo predice"
+            )
+            
+            st.markdown("#### Pesos de Scoring")
             
             peso_frecuencia = st.slider(
                 "Frecuencia General",
@@ -1022,25 +1167,6 @@ def main():
                 0.0, 1.0, OPTIMAL_WEIGHTS['peso_tendencia'], 0.05
             )
             
-            # Mostrar detalles de la optimización
-            with st.expander("📊 Detalles de Optimización"):
-                st.markdown("""
-                **Configuración óptima encontrada mediante:**
-                - ✅ Prueba de 10 configuraciones diversas
-                - ✅ Optimización fina (20 variaciones)
-                - ✅ Búsqueda aleatoria (100 iteraciones)
-                
-                **Resultados en backtesting:**
-                - 🎯 **9/24 aciertos** (2.25 por sorteo)
-                - 📈 Mejora de **+200%** vs configuración inicial
-                - 🏆 Mejor sorteo: 2/6 números acertados
-                
-                **Hallazgos clave:**
-                - Latencia en 0.00 mejora rendimiento
-                - Balance equilibrado entre otros factores
-                - Estrategia BOTH maximiza aciertos
-                """)
-            
             st.markdown("---")
             
             if metodo != GenerationStrategy.STANDARD:
@@ -1052,18 +1178,6 @@ def main():
                 )
             else:
                 peso_correlaciones = 0.3
-        
-        st.markdown("---")
-        
-        # Información del sistema
-        st.markdown("### Estado")
-        if st.session_state.data_loaded:
-            st.success("Datos cargados")
-            st.info(f"{st.session_state.prediction_count} predicciones generadas")
-        else:
-            st.warning("Carga datos para comenzar")
-        
-        st.markdown("---")
     
     # ========================================================================
     # ÁREA PRINCIPAL
@@ -1098,10 +1212,11 @@ def main():
     # PESTAÑAS PRINCIPALES
     # ========================================================================
     
-    tab1, tab2, tab3, tab4 = st.tabs([
+    tab1, tab2, tab3, tab4, tab5 = st.tabs([
         "Predicción", 
         "Análisis", 
         "Visualizaciones",
+        "Validación Temporal",
         "Historial"
     ])
     
@@ -1134,119 +1249,169 @@ def main():
         col_btn1, col_btn2, col_btn3 = st.columns([2, 1, 1])
         
         with col_btn1:
+            texto_boton = "GENERAR PREDICCIONES" if usar_portfolio and n_combinaciones > 1 else "GENERAR PREDICCIÓN"
             generar = st.button(
-                "GENERAR PREDICCIÓN",
+                texto_boton,
                 width='stretch',
                 type="primary"
             )
         
         if generar:
-            with st.spinner("Generando predicción..."):
-                manager = StrategyManager()
-                
-                # Ajustar peso de correlaciones si es condicional
-                if metodo != GenerationStrategy.STANDARD:
-                    manager.conditional_generator.correlation_weight = peso_correlaciones
-                
-                # Generar
-                result = manager.generate(
-                    scores,
-                    strategy=metodo,
-                    correlation_analyzer=corr_analyzer,
-                    use_constraints=True
-                )
-                
-                st.markdown("---")
-                
-                # Mostrar resultados según método
+            # Incrementar contador
+            st.session_state.prediction_count += 1
+            
+            # GENERACIÓN CON PORTFOLIO
+            if usar_portfolio and n_combinaciones > 1:
+                # Si es BOTH, generar ambos métodos
                 if metodo == GenerationStrategy.BOTH:
-                    # AMBOS MÉTODOS
-                    col1, col2 = st.columns(2)
-                    
-                    with col1:
-                        st.markdown("### Método Estándar")
-                        mostrar_numeros_predichos(
-                            result['standard']['combination'],
-                            ""
+                    # MÉTODO ESTÁNDAR
+                    with st.spinner(f"Generando {n_combinaciones} combinaciones (Método Estándar)..."):
+                        portfolio_gen = PortfolioGenerator()
+                        portfolio_std = portfolio_gen.generate_portfolio(
+                            scores,
+                            n_combinaciones,
+                            freq_analyzer,
+                            method=GenerationStrategy.STANDARD
                         )
-                        
-                        st.markdown("##### Estadísticas")
-                        analysis_std = result['standard']['analysis']
-                        
-                        subcol1, subcol2, subcol3 = st.columns(3)
-                        with subcol1:
-                            st.metric("Suma", analysis_std['suma_total'])
-                        with subcol2:
-                            st.metric("Score", f"{analysis_std['score_promedio']:.3f}")
-                        with subcol3:
-                            st.metric("Pares", f"{analysis_std['pares']}/6")
                     
-                    with col2:
-                        st.markdown("### Método Condicional")
-                        mostrar_numeros_predichos(
-                            result['conditional']['combination'],
-                            ""
+                    st.markdown("---")
+                    st.markdown("## Método Estándar")
+                    mostrar_portfolio(portfolio_std, freq_analyzer, portfolio_gen, "Estándar")
+                    
+                    # MÉTODO CONDICIONAL
+                    with st.spinner(f"Generando {n_combinaciones} combinaciones (Método Condicional)..."):
+                        portfolio_gen_cond = PortfolioGenerator()
+                        portfolio_cond = portfolio_gen_cond.generate_portfolio(
+                            scores,
+                            n_combinaciones,
+                            freq_analyzer,
+                            method=GenerationStrategy.CONDITIONAL,
+                            correlation_analyzer=corr_analyzer
                         )
-                        
-                        st.markdown("##### Estadísticas")
-                        analysis_cond = result['conditional']['analysis']
-                        
-                        subcol1, subcol2, subcol3 = st.columns(3)
-                        with subcol1:
-                            st.metric("Suma", analysis_cond['suma_total'])
-                        with subcol2:
-                            st.metric("Score", f"{analysis_cond['score_promedio']:.3f}")
-                        with subcol3:
-                            st.metric("Correlation", f"{analysis_cond['correlation_score']:.3f}")
                     
-                    # Agregar ambas al historial
-                    agregar_al_historial(
-                        result['standard']['combination'],
-                        "Estándar",
-                        analysis_std
-                    )
-                    agregar_al_historial(
-                        result['conditional']['combination'],
-                        "Condicional",
-                        analysis_cond
-                    )
+                    st.markdown("---")
+                    st.markdown("## Método Condicional")
+                    mostrar_portfolio(portfolio_cond, freq_analyzer, portfolio_gen_cond, "Condicional")
                 
                 else:
-                    # UN SOLO MÉTODO
-                    mostrar_numeros_predichos(result['combination'])
+                    # Un solo método
+                    metodo_texto = "Estándar" if metodo == GenerationStrategy.STANDARD else "Condicional"
+                    with st.spinner(f"Generando {n_combinaciones} combinaciones..."):
+                        portfolio_gen = PortfolioGenerator()
+                        portfolio = portfolio_gen.generate_portfolio(
+                            scores,
+                            n_combinaciones,
+                            freq_analyzer,
+                            method=metodo,
+                            correlation_analyzer=corr_analyzer if metodo == GenerationStrategy.CONDITIONAL else None
+                        )
+                    
+                    st.markdown("---")
+                    mostrar_portfolio(portfolio, freq_analyzer, portfolio_gen, metodo_texto)
+            
+            # GENERACIÓN TRADICIONAL (sin portfolio)
+            else:
+                with st.spinner("Generando predicción..."):
+                    manager = StrategyManager()
+                    
+                    # Ajustar peso de correlaciones si es condicional
+                    if metodo != GenerationStrategy.STANDARD:
+                        manager.conditional_generator.correlation_weight = peso_correlaciones
+                    
+                    # Generar
+                    result = manager.generate(
+                        scores,
+                        strategy=metodo,
+                        correlation_analyzer=corr_analyzer,
+                        use_constraints=True
+                    )
                     
                     st.markdown("---")
                     
-                    analysis = result['analysis']
+                    # Mostrar resultados según método
+                    if metodo == GenerationStrategy.BOTH:
+                        # AMBOS MÉTODOS
+                        col1, col2 = st.columns(2)
+                        
+                        with col1:
+                            st.markdown("### Método Estándar")
+                            mostrar_numeros_predichos(
+                                result['standard']['combination'],
+                                ""
+                            )
+                            
+                            st.markdown("##### Estadísticas")
+                            analysis_std = result['standard']['analysis']
+                            
+                            subcol1, subcol2, subcol3 = st.columns(3)
+                            with subcol1:
+                                st.metric("Suma", analysis_std['suma_total'])
+                            with subcol2:
+                                st.metric("Score", f"{analysis_std['score_promedio']:.3f}")
+                            with subcol3:
+                                st.metric("Pares", f"{analysis_std['pares']}/6")
+                        
+                        with col2:
+                            st.markdown("### Método Condicional")
+                            mostrar_numeros_predichos(
+                                result['conditional']['combination'],
+                                ""
+                            )
+                            
+                            st.markdown("##### Estadísticas")
+                            analysis_cond = result['conditional']['analysis']
+                            
+                            subcol1, subcol2, subcol3 = st.columns(3)
+                            with subcol1:
+                                st.metric("Suma", analysis_cond['suma_total'])
+                            with subcol2:
+                                st.metric("Score", f"{analysis_cond['score_promedio']:.3f}")
+                            with subcol3:
+                                st.metric("Correlation", f"{analysis_cond['correlation_score']:.3f}")
+                        
+                        # Agregar ambas al historial
+                        agregar_al_historial(
+                            result['standard']['combination'],
+                            "Estándar",
+                            analysis_std
+                        )
+                        agregar_al_historial(
+                            result['conditional']['combination'],
+                            "Condicional",
+                            analysis_cond
+                        )
                     
-                    # Métricas
-                    col1, col2, col3, col4, col5 = st.columns(5)
+                    else:
+                        # UN SOLO MÉTODO
+                        mostrar_numeros_predichos(result['combination'])
+                        
+                        st.markdown("---")
+                        
+                        analysis = result['analysis']
+                        
+                        # Métricas
+                        col1, col2, col3, col4, col5 = st.columns(5)
+                        
+                        with col1:
+                            st.metric("Suma Total", analysis['suma_total'])
+                        with col2:
+                            st.metric("Score Promedio", f"{analysis['score_promedio']:.3f}")
+                        with col3:
+                            st.metric("Pares", f"{analysis['pares']}/6")
+                        with col4:
+                            st.metric("Impares", f"{analysis['impares']}/6")
+                        with col5:
+                            st.metric("Consecutivos", analysis['consecutivos'])
+                        
+                        # Agregar al historial
+                        metodo_nombre = "Estándar" if metodo == GenerationStrategy.STANDARD else "Condicional"
+                        agregar_al_historial(
+                            result['combination'],
+                            metodo_nombre,
+                            analysis
+                        )
                     
-                    with col1:
-                        st.metric("Suma Total", analysis['suma_total'])
-                    with col2:
-                        st.metric("Score Promedio", f"{analysis['score_promedio']:.3f}")
-                    with col3:
-                        st.metric("Pares", f"{analysis['pares']}/6")
-                    with col4:
-                        st.metric("Impares", f"{analysis['impares']}/6")
-                    with col5:
-                        st.metric("Consecutivos", analysis['consecutivos'])
-                    
-                    # Agregar al historial
-                    metodo_nombre = "Estándar" if metodo == GenerationStrategy.STANDARD else "Condicional"
-                    agregar_al_historial(
-                        result['combination'],
-                        metodo_nombre,
-                        analysis
-                    )
-                
-                st.success("Predicción generada exitosamente")
-                
-                # Botones de acción
-                col_act1, col_act2 = st.columns(2)
-                
-                with col_act1:
+                    # Resumen para copiar
                     # Preparar texto para copiar
                     if metodo == GenerationStrategy.BOTH:
                         nums_std = ', '.join([f"{int(n):02d}" for n in result['standard']['combination']])
@@ -1256,9 +1421,6 @@ def main():
                         texto_copiar = ', '.join([f"{int(n):02d}" for n in result['combination']])
                     
                     st.code(texto_copiar, language=None)
-                
-                with col_act2:
-                    st.info("Usa Ctrl+C para copiar los números")
     
     # ========================================================================
     # TAB 2: ANÁLISIS
@@ -1346,10 +1508,157 @@ def main():
         )
     
     # ========================================================================
-    # TAB 4: HISTORIAL
+    # TAB 4: VALIDACIÓN TEMPORAL
     # ========================================================================
     
     with tab4:
+        st.markdown("## Validación Temporal Walk-Forward")
+        
+        st.info(
+            "Esta validación simula cómo funcionaría el sistema en condiciones reales, "
+            "usando una ventana móvil de entrenamiento para validar la estabilidad de los pesos optimizados."
+        )
+        
+        col_w1, col_w2, col_w3 = st.columns(3)
+        
+        with col_w1:
+            ventana_train = st.number_input(
+                "Ventana de entrenamiento:",
+                min_value=100,
+                max_value=300,
+                value=200,
+                step=10,
+                help="Cantidad de sorteos para entrenar en cada periodo"
+            )
+        
+        with col_w2:
+            ventana_test = st.number_input(
+                "Ventana de test:",
+                min_value=5,
+                max_value=20,
+                value=10,
+                step=1,
+                help="Cantidad de sorteos para evaluar en cada periodo"
+            )
+        
+        with col_w3:
+            step_size = st.number_input(
+                "Step size:",
+                min_value=5,
+                max_value=20,
+                value=10,
+                step=5,
+                help="Cuánto deslizar la ventana en cada iteración"
+            )
+        
+        if st.button("Ejecutar Validación Walk-Forward", type="primary"):
+            try:
+                with st.spinner("Ejecutando validación temporal..."):
+                    data = st.session_state.current_data
+                    
+                    # Pesos a validar
+                    pesos_validar = {
+                        'peso_frecuencia': peso_frecuencia,
+                        'peso_frecuencia_reciente': peso_frecuencia_reciente,
+                        'peso_ciclo': peso_ciclo,
+                        'peso_latencia': peso_latencia,
+                        'peso_tendencia': peso_tendencia
+                    }
+                    
+                    # Crear backtester
+                    wf_backtester = WalkForwardBacktester(
+                        train_window=ventana_train,
+                        test_window=ventana_test,
+                        step_size=step_size
+                    )
+                    
+                    # Ejecutar
+                    results = wf_backtester.run_walk_forward(data, pesos_validar)
+                    
+                    # Mostrar resultados
+                    st.success("Validación completada")
+                    
+                    summary = results['summary']
+                    
+                    col_r1, col_r2, col_r3, col_r4 = st.columns(4)
+                    
+                    with col_r1:
+                        st.metric("Periodos evaluados", summary['total_periodos'])
+                    with col_r2:
+                        st.metric("Accuracy promedio", f"{summary['accuracy_promedio']:.2%}")
+                    with col_r3:
+                        st.metric("Desviación std", f"{summary['accuracy_std']:.2%}")
+                    with col_r4:
+                        stability = wf_backtester.get_stability_score()
+                        st.metric("Score de estabilidad", f"{stability:.2%}")
+                    
+                    st.markdown("---")
+                    
+                    # Gráfico de evolución
+                    plot_data = wf_backtester.plot_results()
+                    
+                    if plot_data:
+                        fig = go.Figure()
+                        
+                        # Línea de accuracy por periodo
+                        fig.add_trace(go.Scatter(
+                            x=plot_data['periodos'],
+                            y=plot_data['accuracies'],
+                            mode='lines+markers',
+                            name='Accuracy',
+                            line=dict(color='#F2A100', width=2),
+                            marker=dict(size=8)
+                        ))
+                        
+                        # Línea de promedio
+                        fig.add_trace(go.Scatter(
+                            x=plot_data['periodos'],
+                            y=[plot_data['accuracy_promedio']] * len(plot_data['periodos']),
+                            mode='lines',
+                            name='Promedio',
+                            line=dict(color='#757575', width=1, dash='dash')
+                        ))
+                        
+                        fig.update_layout(
+                            title='Evolución del Accuracy por Periodo',
+                            xaxis_title='Periodo',
+                            yaxis_title='Accuracy',
+                            plot_bgcolor='white',
+                            paper_bgcolor='white',
+                            font=dict(color='#333333'),
+                            height=400,
+                            hovermode='x unified'
+                        )
+                        
+                        st.plotly_chart(fig, use_container_width=True)
+                        
+                        # Interpretación
+                        st.markdown("### Interpretación")
+                        
+                        if stability > 0.7:
+                            st.success(
+                                "Los pesos optimizados muestran alta estabilidad temporal. "
+                                "El modelo funciona consistentemente en diferentes periodos."
+                            )
+                        elif stability > 0.5:
+                            st.warning(
+                                "Estabilidad moderada. Hay variabilidad en el rendimiento según el periodo. "
+                                "Considera ajustar los pesos o usar ventanas adaptativas."
+                            )
+                        else:
+                            st.error(
+                                "Baja estabilidad temporal. El rendimiento varía significativamente. "
+                                "Los pesos pueden estar sobreajustados a un periodo específico."
+                            )
+            
+            except Exception as e:
+                st.error(f"Error en validación: {str(e)}")
+    
+    # ========================================================================
+    # TAB 5: HISTORIAL
+    # ========================================================================
+    
+    with tab5:
         st.markdown("## Historial de Predicciones")
         
         if len(st.session_state.historial) == 0:
@@ -1372,7 +1681,7 @@ def main():
                             st.write(f"Pares: {entry['scores']['pares']}/6")
             
             # Botón para limpiar historial
-            if st.button("🗑️ Limpiar Historial", type="secondary"):
+            if st.button("Limpiar Historial", type="secondary"):
                 st.session_state.historial = []
                 st.session_state.prediction_count = 0
                 # Eliminar archivo JSON

@@ -48,6 +48,7 @@ class FrequencyAnalyzer:
         self.results['ciclos'] = self._calcular_ciclos()
         self.results['latencia'] = self._calcular_latencia()
         self.results['tendencia'] = self._calcular_tendencia()
+        self.results['momentum'] = self._calcular_momentum()
         
         return self.results
     
@@ -206,6 +207,63 @@ class FrequencyAnalyzer:
                 tendencia[num] = 1.0 if freq_real == 0 else float('inf')
         
         return tendencia
+    
+    def _calcular_momentum(self) -> Dict[int, float]:
+        """
+        Calcula el momentum (aceleración) de aparición de cada número.
+        Analiza si un número está acelerando o desacelerando su frecuencia.
+        
+        Momentum positivo = acelerando (más frecuente en periodos recientes)
+        Momentum negativo = desacelerando (menos frecuente en periodos recientes)
+        
+        Returns:
+            Dict con momentum de cada número (-1 a +1)
+        """
+        momentum = {}
+        
+        # Ventanas para calcular derivada
+        ventanas = [5, 10, 20, 40, 80]
+        
+        # Extraer números de sorteos
+        all_numbers = []
+        for numeros in self.data['numeros']:
+            all_numbers.append(set(numeros))
+        
+        total_sorteos = len(all_numbers)
+        
+        for num in range(self.config['min_number'], self.config['max_number'] + 1):
+            frecuencias_por_ventana = []
+            
+            # Calcular frecuencia en cada ventana
+            for ventana_size in ventanas:
+                if total_sorteos < ventana_size:
+                    continue
+                
+                start_idx = max(0, total_sorteos - ventana_size)
+                count = sum(1 for i in range(start_idx, total_sorteos) if num in all_numbers[i])
+                freq = count / ventana_size
+                frecuencias_por_ventana.append(freq)
+            
+            # Calcular derivada (cambio de frecuencia)
+            if len(frecuencias_por_ventana) >= 3:
+                # Derivada simple: diferencia entre ventanas
+                # Ventanas más recientes tienen más peso
+                cambios = []
+                for i in range(len(frecuencias_por_ventana) - 1):
+                    cambio = frecuencias_por_ventana[i] - frecuencias_por_ventana[i + 1]
+                    # Ponderar: cambios recientes pesan más
+                    peso = (i + 1) / len(frecuencias_por_ventana)
+                    cambios.append(cambio * peso)
+                
+                # Momentum = promedio ponderado de cambios
+                mom = np.mean(cambios) if cambios else 0
+                
+                # Normalizar aproximadamente a rango [-1, 1]
+                momentum[num] = np.clip(mom * 10, -1, 1)
+            else:
+                momentum[num] = 0.0
+        
+        return momentum
     
     def get_scores(self, weights: Dict = None) -> Dict[int, float]:
         """

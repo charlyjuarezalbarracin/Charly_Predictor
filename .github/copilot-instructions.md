@@ -2,8 +2,23 @@
 
 ## 🚫 NO Hacer
 - NO agregar emojis/íconos a botones, labels o elementos de UI
+- NO agregar emojis/íconos en labels, checkboxes, radio buttons, o cualquier elemento visual
+- NO usar colores que se salgan del diseño actual (tema Midasmind)
 - NO crear archivos markdown de documentación/resumen después de cada cambio
 - NO ofrecer opción "Datos de Muestra" en la interfaz
+- NO agregar elementos decorativos, textos de ayuda, expanders o secciones que no sean estrictamente necesarios
+- NO agregar "propaganda" o descripciones promocionales de funcionalidades
+
+## 🎨 Diseño Minimalista y Profesional
+- Sistema serio de predicción, NO es un proyecto de estudiante ni demo
+- Interfaz limpia, sin decoraciones innecesarias
+- Solo texto plano en labels y botones
+- Mantener coherencia con paleta de colores existente: #F2A100 (naranja Midasmind), grises neutros
+- Evitar iconos decorativos, símbolos, o formateos excesivos en la UI
+- Priorizar claridad y funcionalidad sobre estética visual
+- Solo agregar elementos estrictamente necesarios para el funcionamiento
+- Diseño compacto: tamaños de fuente, padding y márgenes reducidos
+- NO usar expanders para ocultar información importante, todo debe ser visible directamente
 
 ## ✅ SÍ Hacer
 - PREGUNTAR antes de implementar cambios para validar comprensión (a menos que usuario diga "hazlo" o "listo")
