@@ -296,6 +296,166 @@ def actualizar_historico_csv(archivo='data/quini6_historico.csv'):
     finally:
         driver.quit()
 
+def obtener_pozos_ultimo_sorteo():
+    """
+    Obtiene los pozos actuales del último sorteo desde /sorteos/ultimo
+    Retorna: dict con pozos de Tradicional, Segunda, Revancha y Siempre Sale
+    """
+    driver = configurar_driver()
+    
+    try:
+        url = "https://quiniya.com.ar/sorteos/ultimo"
+        print(f"\nAccediendo a: {url}")
+        driver.get(url)
+        time.sleep(4)
+        
+        pozos = {
+            'Tradicional': {'premio': None, 'ganadores': None},
+            'Segunda': {'premio': None, 'ganadores': None},
+            'Revancha': {'premio': None, 'ganadores': None},
+            'SiempreSale': {'premio': None, 'ganadores': None}
+        }
+        
+        # Obtener todo el HTML de la página
+        page_html = driver.page_source
+        
+        # Buscar todas las secciones con encabezados
+        sections = driver.find_elements(By.TAG_NAME, 'section')
+        
+        for section in sections:
+            try:
+                section_text = section.text.lower()
+                
+                # Buscar tabla dentro de esta sección
+                try:
+                    tabla = section.find_element(By.TAG_NAME, 'table')
+                except:
+                    continue
+                
+                filas = tabla.find_elements(By.TAG_NAME, 'tr')
+                
+                # Determinar tipo de modalidad basado en el texto de la sección
+                es_tradicional = 'tradicional' in section_text and 'primer sorteo' in section_text
+                es_segunda = 'la segunda' in section_text or ('segunda' in section_text and 'tradicional' not in section_text)
+                es_revancha = 'revancha' in section_text
+                es_siempre_sale = 'siempre sale' in section_text
+                
+                for fila in filas:
+                    try:
+                        celdas = fila.find_elements(By.TAG_NAME, 'td')
+                        if len(celdas) >= 3:
+                            aciertos = celdas[0].text.strip()
+                            col2_texto = celdas[1].text.strip()
+                            col2_lower = col2_texto.lower()
+                            premio_texto = celdas[2].text.strip()
+                            
+                            # Limpiar el número (quitar puntos de miles)
+                            premio = premio_texto.replace('.', '').replace('$', '').strip()
+                            
+                            # Tradicional: 6 aciertos con "Pozo Vacante"
+                            if es_tradicional and aciertos == '6' and 'pozo vacante' in col2_lower and pozos['Tradicional']['premio'] is None:
+                                pozos['Tradicional'] = {'premio': premio, 'ganadores': col2_texto}
+                                print(f"  Tradicional: ${premio} - {col2_texto}")
+                            
+                            # Segunda: 6 aciertos con "Pozo Vacante"
+                            elif es_segunda and aciertos == '6' and 'pozo vacante' in col2_lower and pozos['Segunda']['premio'] is None:
+                                pozos['Segunda'] = {'premio': premio, 'ganadores': col2_texto}
+                                print(f"  Segunda: ${premio} - {col2_texto}")
+                            
+                            # Revancha: 6 aciertos (primer valor)
+                            elif es_revancha and aciertos == '6' and pozos['Revancha']['premio'] is None:
+                                pozos['Revancha'] = {'premio': premio, 'ganadores': col2_texto}
+                                print(f"  Revancha: ${premio} - {col2_texto}")
+                            
+                            # Siempre Sale: 5 aciertos
+                            elif es_siempre_sale and aciertos == '5' and pozos['SiempreSale']['premio'] is None:
+                                pozos['SiempreSale'] = {'premio': premio, 'ganadores': col2_texto}
+                                print(f"  Siempre Sale: ${premio} - {col2_texto}")
+                    
+                    except Exception:
+                        continue
+            
+            except Exception:
+                continue
+        
+        # Si no se encontraron con sections, intentar búsqueda directa
+        if not any(p.get('premio') for p in pozos.values()):
+            try:
+                tablas = driver.find_elements(By.CSS_SELECTOR, 'table.table')
+                
+                for i, tabla in enumerate(tablas):
+                    # Buscar el encabezado más cercano antes de esta tabla
+                    try:
+                        # Obtener elemento padre y buscar h2/h3 hermanos
+                        parent = tabla.find_element(By.XPATH, '..')
+                        titulo_elem = None
+                        
+                        try:
+                            titulo_elem = parent.find_element(By.XPATH, './preceding-sibling::*[self::h2 or self::h3][1]')
+                        except:
+                            try:
+                                titulo_elem = parent.find_element(By.XPATH, './/h2 | .//h3')
+                            except:
+                                pass
+                        
+                        titulo = titulo_elem.text.lower() if titulo_elem else ''
+                        
+                        # También revisar el HTML alrededor
+                        tabla_html = tabla.get_attribute('outerHTML').lower()
+                        
+                        filas = tabla.find_elements(By.TAG_NAME, 'tr')
+                        
+                        for fila in filas:
+                            try:
+                                celdas = fila.find_elements(By.TAG_NAME, 'td')
+                                if len(celdas) >= 3:
+                                    aciertos = celdas[0].text.strip()
+                                    col2_texto = celdas[1].text.strip()
+                                    col2_lower = col2_texto.lower()
+                                    premio_texto = celdas[2].text.strip()
+                                    
+                                    premio = premio_texto.replace('.', '').replace('$', '').strip()
+                                    
+                                    # Identificar según título y contenido
+                                    if aciertos == '6' and 'pozo vacante' in col2_lower:
+                                        if 'tradicional' in titulo and pozos['Tradicional']['premio'] is None:
+                                            pozos['Tradicional'] = {'premio': premio, 'ganadores': col2_texto}
+                                            print(f"  Tradicional: ${premio} - {col2_texto}")
+                                        elif 'segunda' in titulo and pozos['Segunda']['premio'] is None:
+                                            pozos['Segunda'] = {'premio': premio, 'ganadores': col2_texto}
+                                            print(f"  Segunda: ${premio} - {col2_texto}")
+                                    elif aciertos == '6' and 'revancha' in titulo and pozos['Revancha']['premio'] is None:
+                                        pozos['Revancha'] = {'premio': premio, 'ganadores': col2_texto}
+                                        print(f"  Revancha: ${premio} - {col2_texto}")
+                                    elif aciertos == '5' and 'siempre sale' in titulo and pozos['SiempreSale']['premio'] is None:
+                                        pozos['SiempreSale'] = {'premio': premio, 'ganadores': col2_texto}
+                                        print(f"  Siempre Sale: ${premio} - {col2_texto}")
+                            
+                            except Exception:
+                                continue
+                    
+                    except Exception:
+                        continue
+            
+            except Exception as e:
+                print(f"  Error en búsqueda alternativa: {e}")
+        
+        print(f"\n✓ Pozos obtenidos:")
+        for modalidad, data in pozos.items():
+            if data and data.get('premio'):
+                print(f"  {modalidad}: ${data['premio']} - {data.get('ganadores', 'N/A')}")
+        
+        return pozos
+    
+    except Exception as e:
+        print(f"✗ Error obteniendo pozos: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
+    
+    finally:
+        driver.quit()
+
 def main():
     print("="*80)
     print("SCRAPER QUINIYA.COM.AR - EXTRACCIÓN MASIVA DE DATOS HISTÓRICOS")

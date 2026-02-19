@@ -20,7 +20,7 @@ from core.scoring import UnifiedScorer
 from core.generator import StrategyManager, GenerationStrategy, PortfolioGenerator
 from core.backtesting import WalkForwardBacktester
 from utils.data_generator import generate_sample_data
-from varios.scraper_quiniya_final import actualizar_historico_csv
+from varios.scraper_quiniya_final import actualizar_historico_csv, obtener_pozos_ultimo_sorteo
 
 # Importar configuración optimizada
 try:
@@ -91,6 +91,7 @@ st.markdown("""
         align-items: center;
         justify-content: center;
         min-height: 112px;
+        position: relative;
     }
 
     .app-banner {
@@ -126,6 +127,15 @@ st.markdown("""
         color: rgba(255,255,255,0.95);
         margin: 6px 0 0 0;
         font-size: 12px;
+        font-weight: 400;
+    }
+
+    .banner-fecha {
+        position: absolute;
+        right: 20px;
+        bottom: 18px;
+        color: rgba(255,255,255,0.85);
+        font-size: 11px;
         font-weight: 400;
     }
 
@@ -167,7 +177,7 @@ st.markdown("""
         grid-template-columns: repeat(6, 95px);
         gap: 12px;
         justify-content: flex-start;
-        margin: 20px 0;
+        margin: 2px 0 15px 0;
     }
     
     /* Tarjetas de estadísticas */
@@ -221,16 +231,16 @@ st.markdown("""
     h2 {
         color: #333333 !important;
         font-size: 1.5rem !important;
-        margin-top: 1rem !important;
-        margin-bottom: 0.5rem !important;
+        margin-top: 0.8rem !important;
+        margin-bottom: 0.2rem !important;
         font-weight: 600 !important;
     }
     
     h3 {
         color: #F2A100 !important;
         font-size: 1.1rem !important;
-        margin-top: 0.7rem !important;
-        margin-bottom: 0.4rem !important;
+        margin-top: 0.5rem !important;
+        margin-bottom: 0.2rem !important;
         font-weight: 600 !important;
     }
 
@@ -390,8 +400,12 @@ st.markdown("""
     [data-testid="stSidebar"] .stAlert {
         padding: 6px 10px;
         border-radius: 15px;
-        font-size: 0.9rem;
+        font-size: 0.75rem;
         border: none;
+    }
+
+    [data-testid="stSidebar"] .stAlert p {
+        font-size: 0.75rem !important;
     }
 
     /* Sidebar - Compactar contenedores */
@@ -678,6 +692,64 @@ st.markdown("""
             font-size: 0.85rem !important;
         }
     }
+
+    /* Sección de Pozos */
+    .pozos-container {
+        background: white;
+        border-radius: 15px;
+        padding: 16px 20px;
+        margin: 10px 0 20px 0;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+
+    .pozos-title {
+        color: #333333;
+        font-size: 1.1rem;
+        font-weight: 600;
+        margin-bottom: 12px;
+        text-align: center;
+    }
+
+    .pozos-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 12px;
+    }
+
+    .pozo-card {
+        background: linear-gradient(135deg, rgba(242, 161, 0, 0.08) 0%, rgba(229, 142, 0, 0.08) 100%);
+        border: 2px solid #F2A100;
+        border-radius: 12px;
+        padding: 12px;
+        text-align: center;
+    }
+
+    .pozo-modalidad {
+        color: #666666;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        margin-bottom: 6px;
+    }
+
+    .pozo-valor {
+        color: #F2A100;
+        font-size: 1.1rem;
+        font-weight: 700;
+    }
+
+    .pozo-info {
+        color: rgba(102, 102, 102, 0.85);
+        font-size: 11px;
+        font-weight: 400;
+        margin-top: 4px;
+    }
+
+    @media (max-width: 768px) {
+        .pozos-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -687,6 +759,7 @@ st.markdown("""
 # ============================================================================
 
 HISTORIAL_FILE = Path('data/historial_predicciones.json')
+POZOS_FILE = Path('data/pozos_actuales.json')
 
 def convertir_a_serializable(obj):
     """Convertir tipos numpy a tipos nativos de Python para JSON"""
@@ -729,6 +802,81 @@ def cargar_historial_json():
         st.warning(f"No se pudo cargar el historial: {str(e)}")
         return []
 
+def guardar_pozos_json(pozos):
+    """Guardar pozos en archivo JSON"""
+    try:
+        POZOS_FILE.parent.mkdir(parents=True, exist_ok=True)
+        with open(POZOS_FILE, 'w', encoding='utf-8') as f:
+            json.dump(pozos, f, indent=2, ensure_ascii=False)
+    except Exception as e:
+        print(f"No se pudo guardar pozos: {str(e)}")
+
+def cargar_pozos_json():
+    """Cargar pozos desde archivo JSON"""
+    try:
+        if POZOS_FILE.exists():
+            with open(POZOS_FILE, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        return None
+    except Exception as e:
+        print(f"No se pudo cargar pozos: {str(e)}")
+        return None
+
+def obtener_ultima_fecha_csv():
+    """Obtener la última fecha del archivo CSV"""
+    try:
+        csv_path = Path('data/quini6_historico.csv')
+        if csv_path.exists():
+            df = pd.read_csv(csv_path)
+            if 'fecha' in df.columns and len(df) > 0:
+                ultima_fecha = df['fecha'].max()
+                # Formatear fecha a DD/MM/YYYY
+                try:
+                    fecha_obj = pd.to_datetime(ultima_fecha)
+                    return fecha_obj.strftime('%d/%m/%Y')
+                except:
+                    return ultima_fecha
+        return None
+    except Exception:
+        return None
+
+def formatear_pozo(data):
+    """Formatear valor de pozo con separadores de miles"""
+    if not data:
+        return 'N/A', ''
+    
+    # Si es un dict con premio y ganadores
+    if isinstance(data, dict):
+        premio = data.get('premio')
+        ganadores = data.get('ganadores') or ''
+        
+        if premio:
+            try:
+                numero = int(premio)
+                premio_formateado = f"{numero:,}".replace(',', '.')
+                
+                # Formatear ganadores: si es un número, agregar "Ganadores"
+                if ganadores:
+                    try:
+                        int(ganadores)
+                        ganadores = f"Ganadores {ganadores}"
+                    except:
+                        pass  # Mantener el texto original (ej: "Pozo Vacante")
+                
+                return premio_formateado, ganadores
+            except:
+                return premio, ganadores
+        return 'N/A', ''
+    
+    # Compatibilidad con formato antiguo (string simple)
+    if not data or data == 'N/A':
+        return 'N/A', ''
+    try:
+        numero = int(data)
+        return f"{numero:,}".replace(',', '.'), ''
+    except:
+        return data, ''
+
 def init_session_state():
     """Inicializar variables de sesión"""
     if 'historial' not in st.session_state:
@@ -740,6 +888,11 @@ def init_session_state():
         st.session_state.current_data = None
     if 'prediction_count' not in st.session_state:
         st.session_state.prediction_count = len(st.session_state.historial)
+    if 'pozos_actuales' not in st.session_state:
+        # Cargar pozos desde JSON
+        st.session_state.pozos_actuales = cargar_pozos_json()
+    if 'ultima_fecha_csv' not in st.session_state:
+        st.session_state.ultima_fecha_csv = obtener_ultima_fecha_csv()
 
 
 def agregar_al_historial(prediccion, metodo, scores_info):
@@ -1029,13 +1182,62 @@ def main():
     init_session_state()
     
     # HEADER
-    st.markdown("""
+    fecha_info = f"<div class='banner-fecha'>Datos actualizados al {st.session_state.ultima_fecha_csv}</div>" if st.session_state.ultima_fecha_csv else ""
+    
+    st.markdown(f"""
         <div class="app-banner">
             <div class="banner-logo">CP</div>
             <div class="banner-title">Charly Predictor</div>
-            <div class="banner-subtitle">Sistema Profesional de Predicción de Quini 6</div>
+            <div class="banner-subtitle">Quini 6</div>
+            {fecha_info}
         </div>
     """, unsafe_allow_html=True)
+    
+    # POZOS ACTUALES
+    if st.session_state.pozos_actuales:
+        pozos = st.session_state.pozos_actuales
+        
+        # Formatear valores con separadores de miles y obtener info de ganadores
+        tradicional, trad_info = formatear_pozo(pozos.get('Tradicional'))
+        segunda, seg_info = formatear_pozo(pozos.get('Segunda'))
+        revancha, rev_info = formatear_pozo(pozos.get('Revancha'))
+        siempre_sale, ss_info = formatear_pozo(pozos.get('SiempreSale'))
+        
+        # Reemplazar strings vacíos por guión para mejor visualización
+        trad_info = trad_info if trad_info else '-'
+        seg_info = seg_info if seg_info else '-'
+        rev_info = rev_info if rev_info else '-'
+        ss_info = ss_info if ss_info else '-'
+        
+        pozos_html = f"""
+        <div class="pozos-container">
+            <div class="pozos-title">Pozos Actuales</div>
+            <div class="pozos-grid">
+                <div class="pozo-card">
+                    <div class="pozo-modalidad">Tradicional</div>
+                    <div class="pozo-valor">${tradicional}</div>
+                    <div class="pozo-info">{trad_info}</div>
+                </div>
+                <div class="pozo-card">
+                    <div class="pozo-modalidad">La Segunda</div>
+                    <div class="pozo-valor">${segunda}</div>
+                    <div class="pozo-info">{seg_info}</div>
+                </div>
+                <div class="pozo-card">
+                    <div class="pozo-modalidad">Revancha</div>
+                    <div class="pozo-valor">${revancha}</div>
+                    <div class="pozo-info">{rev_info}</div>
+                </div>
+                <div class="pozo-card">
+                    <div class="pozo-modalidad">Siempre Sale</div>
+                    <div class="pozo-valor">${siempre_sale}</div>
+                    <div class="pozo-info">{ss_info}</div>
+                </div>
+            </div>
+        </div>
+        """
+        
+        st.markdown(pozos_html, unsafe_allow_html=True)
     
     # ========================================================================
     # SIDEBAR - CONFIGURACIÓN
@@ -1047,7 +1249,7 @@ def main():
         <div class="sidebar-banner">
             <div class="banner-logo">CP</div>
             <div class="banner-title">Charly Predictor</div>
-            <div class="banner-subtitle">¡Predicciones inteligentes de Quini 6!</div>
+            <div class="banner-subtitle">Quini 6</div>
         </div>
         """, unsafe_allow_html=True)
         
@@ -1065,10 +1267,11 @@ def main():
                 data = cargar_datos()
                 st.session_state.current_data = data
                 st.session_state.data_loaded = True
+                st.session_state.ultima_fecha_csv = obtener_ultima_fecha_csv()
 
         # Actualizar desde QuiniYa
-        if st.button("Actualizar datos desde QuiniYa", width='stretch'):
-            with st.spinner("Actualizando datos desde QuiniYa..."):
+        if st.button("Actualizar datos", width='stretch'):
+            with st.spinner("Actualizando datos desde la red"):
                 try:
                     nuevos = actualizar_historico_csv('data/quini6_historico.csv')
                     # Limpiar cachés para forzar recarga con datos nuevos
@@ -1078,12 +1281,38 @@ def main():
                     data = cargar_datos()
                     st.session_state.current_data = data
                     st.session_state.data_loaded = True
+                    
+                    # Actualizar última fecha del CSV
+                    st.session_state.ultima_fecha_csv = obtener_ultima_fecha_csv()
+                    
+                    # Obtener pozos actuales
+                    pozos = obtener_pozos_ultimo_sorteo()
+                    if pozos:
+                        st.session_state.pozos_actuales = pozos
+                        # Guardar pozos en JSON para persistencia
+                        guardar_pozos_json(pozos)
+                    
+                    # Construir mensaje combinado
+                    mensajes = []
                     if nuevos > 0:
-                        st.success(f"✅ Agregados {nuevos} sorteos nuevos. Datos y análisis actualizados.")
+                        mensajes.append(f"Agregados {nuevos} sorteos nuevos.")
                     else:
-                        st.info("ℹ️ No hay sorteos nuevos para agregar")
+                        mensajes.append("No hay sorteos nuevos para agregar.")
+                    
+                    if pozos:
+                        mensajes.append("Pozos actualizados correctamente")
+                    
+                    # Mostrar mensaje combinado
+                    mensaje_final = "\n".join(mensajes)
+                    if nuevos > 0 or pozos:
+                        st.success(mensaje_final)
+                    else:
+                        st.info(mensaje_final)
+                    
+                    # Recargar la página para mostrar los pozos actualizados
+                    st.rerun()
                 except Exception as e:
-                    st.error(f"❌ Error al actualizar datos: {str(e)}")
+                    st.error(f"Error al actualizar datos: {str(e)}")
         
         st.markdown("---")
         
