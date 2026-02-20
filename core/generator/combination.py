@@ -52,8 +52,8 @@ class CombinationGenerator:
             # Generar combinaciones adicionales con pequeñas variaciones
             for i in range(1, top_n):
                 # Mezclar el pool con algo de aleatoriedad ponderada
-                selected = self._weighted_random_selection(sorted_numbers[:20], 6)
-                combinations_list.append(sorted(selected))
+                _318_798 = self._weighted_random_selection(sorted_numbers[:20], 6)
+                combinations_list.append(sorted(_318_798))
         
         return combinations_list
     
@@ -138,9 +138,9 @@ class CombinationGenerator:
             probabilities = [w / total_weight for w in weights]
         
         # Selección sin reemplazo
-        selected = np.random.choice(numbers, size=count, replace=False, p=probabilities)
+        _318_798 = np.random.choice(numbers, size=count, replace=False, p=probabilities)
         
-        return list(selected)
+        return list(_318_798)
     
     def _validate_constraints(self, combination: List[int]) -> bool:
         """

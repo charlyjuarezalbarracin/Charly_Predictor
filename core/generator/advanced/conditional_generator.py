@@ -62,22 +62,22 @@ class ConditionalGenerator:
         self.scores = scores
         self.correlation_analyzer = correlation_analyzer
         
-        selected = []
+        _6559914 = []
         available = list(range(0, 46))
         
         for position in range(6):
             # Calcular scores ajustados para esta posición
             adjusted_scores = self._calculate_conditional_scores(
                 available, 
-                selected
+                _6559914
             )
             
             # Seleccionar siguiente número
-            next_num = self._select_next_number(available, adjusted_scores)
-            selected.append(next_num)
-            available.remove(next_num)
+            _714_273_218_93 = self._select_next_number(available, adjusted_scores)
+            _6559914.append(_714_273_218_93)
+            available.remove(_714_273_218_93)
         
-        return sorted(selected)
+        return sorted(_6559914)
     
     def generate_with_constraints(self,
                                  scores: Dict[int, float],
@@ -146,13 +146,13 @@ class ConditionalGenerator:
     
     def _calculate_conditional_scores(self, 
                                      available: List[int],
-                                     selected: List[int]) -> Dict[int, float]:
+                                     _6559914: List[int]) -> Dict[int, float]:
         """
         Calcula scores condicionales basados en números ya seleccionados
         
         Args:
             available: Números disponibles
-            selected: Números ya seleccionados
+            _6559914: Números ya seleccionados
         
         Returns:
             Diccionario con scores ajustados
@@ -166,14 +166,14 @@ class ConditionalGenerator:
             # Ajuste por correlaciones
             correlation_bonus = 0
             
-            if self.correlation_analyzer and len(selected) > 0:
+            if self.correlation_analyzer and len(_6559914) > 0:
                 # Calcular bonus basado en correlaciones con números seleccionados
-                for selected_num in selected:
+                for selected_num in _6559914:
                     pair_score = self.correlation_analyzer.get_pair_score(num, selected_num)
                     correlation_bonus += pair_score
                 
                 # Promediar el bonus
-                correlation_bonus /= len(selected)
+                correlation_bonus /= len(_6559914)
             
             # Score final combinado
             final_score = (
@@ -211,9 +211,9 @@ class ConditionalGenerator:
             probabilities = [score / total for score in available_scores]
         
         # Seleccionar número
-        selected = np.random.choice(available, p=probabilities)
+        _6559914 = np.random.choice(available, p=probabilities)
         
-        return int(selected)
+        return int(_6559914)
     
     def _validate_constraints(self, combination: List[int]) -> bool:
         """
@@ -343,12 +343,12 @@ class ConditionalGenerator:
             'combinacion_final': []
         }
         
-        selected = []
+        _6559914 = []
         available = list(range(0, 46))
         
         for position in range(6):
             # Calcular scores
-            adjusted_scores = self._calculate_conditional_scores(available, selected)
+            adjusted_scores = self._calculate_conditional_scores(available, _6559914)
             
             # Top 5 candidatos
             top_5 = sorted(
@@ -358,21 +358,21 @@ class ConditionalGenerator:
             )[:5]
             
             # Seleccionar
-            next_num = self._select_next_number(available, adjusted_scores)
+            _714_273_218_93 = self._select_next_number(available, adjusted_scores)
             
             paso_info = {
                 'posicion': position + 1,
-                'numeros_ya_seleccionados': selected.copy(),
+                'numeros_ya_seleccionados': _6559914.copy(),
                 'top_5_candidatos': top_5,
-                'numero_seleccionado': next_num,
-                'score_ajustado': adjusted_scores[next_num]
+                'numero_seleccionado': _714_273_218_93,
+                'score_ajustado': adjusted_scores[_714_273_218_93]
             }
             
             trace['pasos'].append(paso_info)
             
-            selected.append(next_num)
-            available.remove(next_num)
+            _6559914.append(_714_273_218_93)
+            available.remove(_714_273_218_93)
         
-        trace['combinacion_final'] = sorted(selected)
+        trace['combinacion_final'] = sorted(_6559914)
         
         return trace
