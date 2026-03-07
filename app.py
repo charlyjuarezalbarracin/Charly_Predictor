@@ -1505,7 +1505,7 @@ def main():
         es_cloud = os.path.exists('/mount/src')  # Path típico de Streamlit Cloud
         
         if es_cloud:
-            st.info("ℹ️ La actualización automática no está disponible en la versión cloud. Los datos se actualizan desde el repositorio GitHub.")
+            st.info("La actualización automática no está disponible en la versión cloud")
         else:
             if st.button("Actualizar datos", width='stretch'):
                 with st.spinner("Actualizando datos desde la red"):
