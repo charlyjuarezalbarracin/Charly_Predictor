@@ -1500,49 +1500,56 @@ def main():
                 st.session_state.ultima_fecha_csv = obtener_ultima_fecha_csv()
 
         # Actualizar desde QuiniYa
-        if st.button("Actualizar datos", width='stretch'):
-            with st.spinner("Actualizando datos desde la red"):
-                try:
-                    nuevos = actualizar_historico_csv('data/quini6_historico.csv')
-                    # Limpiar cachés para forzar recarga con datos nuevos
-                    cargar_datos.clear()
-                    ejecutar_analisis.clear()
-                    # Recargar datos y análisis con sorteos nuevos
-                    data = cargar_datos()
-                    st.session_state.current_data = data
-                    st.session_state.data_loaded = True
-                    
-                    # Actualizar última fecha del CSV
-                    st.session_state.ultima_fecha_csv = obtener_ultima_fecha_csv()
-                    
-                    # Obtener pozos actuales
-                    pozos = obtener_pozos_ultimo_sorteo()
-                    if pozos:
-                        st.session_state.pozos_actuales = pozos
-                        # Guardar pozos en JSON para persistencia
-                        guardar_pozos_json(pozos)
-                    
-                    # Construir mensaje combinado
-                    mensajes = []
-                    if nuevos > 0:
-                        mensajes.append(f"Agregados {nuevos} sorteos nuevos.")
-                    else:
-                        mensajes.append("No hay sorteos nuevos para agregar.")
-                    
-                    if pozos:
-                        mensajes.append("Pozos actualizados correctamente")
-                    
-                    # Mostrar mensaje combinado
-                    mensaje_final = "\n".join(mensajes)
-                    if nuevos > 0 or pozos:
-                        st.success(mensaje_final)
-                    else:
-                        st.info(mensaje_final)
-                    
-                    # Recargar la página para mostrar los pozos actualizados
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Error al actualizar datos: {str(e)}")
+        # Detectar si estamos en Streamlit Cloud
+        import os
+        es_cloud = os.path.exists('/mount/src')  # Path típico de Streamlit Cloud
+        
+        if es_cloud:
+            st.info("ℹ️ La actualización automática no está disponible en la versión cloud. Los datos se actualizan desde el repositorio GitHub.")
+        else:
+            if st.button("Actualizar datos", width='stretch'):
+                with st.spinner("Actualizando datos desde la red"):
+                    try:
+                        nuevos = actualizar_historico_csv('data/quini6_historico.csv')
+                        # Limpiar cachés para forzar recarga con datos nuevos
+                        cargar_datos.clear()
+                        ejecutar_analisis.clear()
+                        # Recargar datos y análisis con sorteos nuevos
+                        data = cargar_datos()
+                        st.session_state.current_data = data
+                        st.session_state.data_loaded = True
+                        
+                        # Actualizar última fecha del CSV
+                        st.session_state.ultima_fecha_csv = obtener_ultima_fecha_csv()
+                        
+                        # Obtener pozos actuales
+                        pozos = obtener_pozos_ultimo_sorteo()
+                        if pozos:
+                            st.session_state.pozos_actuales = pozos
+                            # Guardar pozos en JSON para persistencia
+                            guardar_pozos_json(pozos)
+                        
+                        # Construir mensaje combinado
+                        mensajes = []
+                        if nuevos > 0:
+                            mensajes.append(f"Agregados {nuevos} sorteos nuevos.")
+                        else:
+                            mensajes.append("No hay sorteos nuevos para agregar.")
+                        
+                        if pozos:
+                            mensajes.append("Pozos actualizados correctamente")
+                        
+                        # Mostrar mensaje combinado
+                        mensaje_final = "\n".join(mensajes)
+                        if nuevos > 0 or pozos:
+                            st.success(mensaje_final)
+                        else:
+                            st.info(mensaje_final)
+                        
+                        # Recargar la página para mostrar los pozos actualizados
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Error al actualizar datos: {str(e)}")
         
         st.markdown("---")
         
