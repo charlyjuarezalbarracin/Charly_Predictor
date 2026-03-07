@@ -897,6 +897,71 @@ def formatear_pozo(data):
     except:
         return data, ''
 
+def controlar_boleta(numeros_jugados, data):
+    """
+    Controla una jugada de 6 números contra los últimos 4 sorteos (última fecha)
+    
+    Args:
+        numeros_jugados: Lista de 6 números ingresados por el usuario
+        data: DataFrame con todos los sorteos históricos
+    
+    Returns:
+        Lista de 4 dicts con resultados (Tradicional, Segunda, Revancha, Siempre Sale)
+    """
+    # Obtener la última fecha (día con 4 sorteos)
+    ultima_fecha = data['fecha'].max()
+    ultimos_sorteos = data[data['fecha'] == ultima_fecha].tail(4)
+    
+    if len(ultimos_sorteos) != 4:
+        return None
+    
+    # Nombres de las modalidades en orden
+    modalidades = ['Tradicional', 'Segunda', 'Revancha', 'Siempre Sale']
+    
+    resultados = []
+    for idx, (_, sorteo) in enumerate(ultimos_sorteos.iterrows()):
+        # El DataFrame tiene una columna 'numeros' que es una lista
+        numeros_sorteo = sorteo['numeros'] if isinstance(sorteo['numeros'], list) else list(sorteo['numeros'])
+        
+        # Calcular coincidencias
+        numeros_acertados = [n for n in numeros_jugados if n in numeros_sorteo]
+        aciertos = len(numeros_acertados)
+        
+        resultados.append({
+            'modalidad': modalidades[idx],
+            'numeros_sorteo': numeros_sorteo,
+            'numeros_jugados': numeros_jugados,
+            'numeros_acertados': numeros_acertados,
+            'aciertos': aciertos,
+            'fecha': ultima_fecha
+        })
+    
+    return resultados
+
+
+def mostrar_bolillas(numeros_sorteo, numeros_acertados):
+    """
+    Muestra números como bolillas/esferas con estilo QuiniYa
+    Destaca en verde los números acertados
+    """
+    html_parts = ['<div style="display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; margin: 20px 0;">']
+    
+    for num in numeros_sorteo:
+        # Verde si es un acierto, gris claro si no
+        if num in numeros_acertados:
+            color = 'linear-gradient(135deg, #32CD32, #228B22)'  # Verde
+            text_color = 'white'
+        else:
+            color = '#E8E8E8'  # Gris claro
+            text_color = '#666666'  # Texto gris oscuro
+        
+        bolilla = f'<div style="width: 52px; height: 52px; border-radius: 50%; background: {color}; color: {text_color}; font-weight: bold; font-size: 24px; display: flex; justify-content: center; align-items: center; text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2); border: 3px solid #CCCCCC; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);">{num:02d}</div>'
+        html_parts.append(bolilla)
+    
+    html_parts.append('</div>')
+    return ''.join(html_parts)
+
+
 def init_session_state():
     """Inicializar variables de sesión"""
     if 'historial' not in st.session_state:
@@ -1645,8 +1710,9 @@ def main():
     # PESTAÑAS PRINCIPALES
     # ========================================================================
     
-    tab1, tab2, tab3, tab4, tab5 = st.tabs([
-        "Predicción", 
+    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+        "Predicción",
+        "Control Boleta",
         "Análisis", 
         "Visualizaciones",
         "Validación Temporal",
@@ -1902,10 +1968,172 @@ def main():
                     st.code(texto_copiar, language=None)
     
     # ========================================================================
-    # TAB 2: ANÁLISIS
+    # TAB 2: CONTROL BOLETA
     # ========================================================================
     
     with tab2:
+        st.markdown("## Control de Boleta")
+        st.markdown("Ingresa tus 6 números y verifica cuántos aciertos tuviste en la última fecha.")
+        
+        # Área de ingreso de números
+        st.markdown("### Ingresa tus números")
+        
+        # CSS para inputs circulares limpios
+        st.markdown("""
+        <style>
+        /* Contenedor principal de inputs con flexbox */
+        div[data-testid="column"]:has([data-testid="stTextInput"]) {
+            padding: 0 3px !important;
+            min-width: 0 !important;
+        }
+        
+        /* Estilos para los text inputs */
+        [data-testid="stTextInput"] {
+            width: 64px !important;
+        }
+        [data-testid="stTextInput"] > div {
+            width: 64px !important;
+            height: 70px !important;
+        }
+        [data-testid="stTextInput"] > div > div {
+            width: 64px !important;
+            height: 64px !important;
+        }
+        [data-testid="stTextInput"] input {
+            width: 64px !important;
+            height: 64px !important;
+            border-radius: 50% !important;
+            text-align: center !important;
+            font-size: 24px !important;
+            font-weight: bold !important;
+            border: 3px solid #CCCCCC !important;
+            background: #F5F5F5 !important;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15) !important;
+            padding: 0 !important;
+            line-height: 64px !important;
+            box-sizing: border-box !important;
+        }
+        [data-testid="stTextInput"] input:focus {
+            border: 3px solid #F2A100 !important;
+            outline: none !important;
+        }
+        [data-testid="stTextInput"] label {
+            display: none !important;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+        
+        # Layout centrado: columna vacía | 6 inputs | columna vacía
+        cols_layout = st.columns([0.25, 0.5, 0.25])
+        
+        with cols_layout[1]:
+            cols_input = st.columns(6, gap="small")
+            numeros_texto = []
+            
+            for i, col in enumerate(cols_input):
+                with col:
+                    num_str = st.text_input(
+                        f"N{i}",
+                        value="",
+                        max_chars=2,
+                        key=f"control_num_{i}",
+                        label_visibility="collapsed",
+                        placeholder=""
+                    )
+                    numeros_texto.append(num_str)
+        
+        # Convertir y validar
+        numeros_ingresados = []
+        for num_str in numeros_texto:
+            try:
+                num = int(num_str) if num_str.strip() else 0
+                if 0 <= num <= 45:
+                    numeros_ingresados.append(num)
+                else:
+                    numeros_ingresados.append(0)
+            except:
+                numeros_ingresados.append(0)
+        
+        st.markdown("<br>", unsafe_allow_html=True)
+        
+        # Botón con el mismo ancho que las 6 esferas
+        cols_button = st.columns([0.25, 0.5, 0.25])
+        with cols_button[1]:
+            verificar = st.button("Verificar", type="primary", use_container_width=True)
+        
+        # Validaciones
+        if verificar:
+            # Validar que no haya números repetidos
+            if len(set(numeros_ingresados)) != 6:
+                st.error("⚠️ No puedes repetir números. Cada número debe ser único.")
+            elif 0 in numeros_ingresados:
+                st.warning("⚠️ Por favor completa los 6 números (no pueden ser 0).")
+            else:
+                # Realizar control
+                data = st.session_state.current_data
+                resultados = controlar_boleta(numeros_ingresados, data)
+                
+                if resultados:
+                    st.success(f"✅ Controlando contra los sorteos del {resultados[0]['fecha']}")
+                    
+                    # Mostrar resultados en 4 tarjetas (2x2)
+                    st.markdown("---")
+                    
+                    for i in range(0, 4, 2):
+                        cols = st.columns(2)
+                        
+                        for j in range(2):
+                            if i + j < len(resultados):
+                                resultado = resultados[i + j]
+                                
+                                with cols[j]:
+                                    # Título de la modalidad con estilo simple
+                                    st.markdown(f"""
+                                    <h3 style="
+                                        color: #F2A100;
+                                        text-align: center;
+                                        margin-bottom: 15px;
+                                        padding-bottom: 10px;
+                                        border-bottom: 2px solid #F2A100;
+                                    ">
+                                        {resultado['modalidad']}
+                                    </h3>
+                                    """, unsafe_allow_html=True)
+                                    
+                                    # Mostrar bolillas
+                                    bolillas_html = mostrar_bolillas(
+                                        resultado['numeros_sorteo'],
+                                        resultado['numeros_acertados']
+                                    )
+                                    st.markdown(bolillas_html, unsafe_allow_html=True)
+                                    
+                                    # Mostrar aciertos
+                                    st.markdown(f"""
+                                    <div style="text-align: center; margin: 20px 0;">
+                                        <p style="font-size: 24px; font-weight: bold; margin: 10px 0;">
+                                            Aciertos: {resultado['aciertos']}
+                                        </p>
+                                    </div>
+                                    """, unsafe_allow_html=True)
+                                    
+                                    # Mensaje según aciertos
+                                    if resultado['aciertos'] >= 4:
+                                        if resultado['aciertos'] == 6:
+                                            st.success("🎉 ¡FELICITACIONES! ¡Ganaste el premio mayor!")
+                                        elif resultado['aciertos'] == 5:
+                                            st.success("🎊 ¡Excelente! ¡5 aciertos! ¡Premio importante!")
+                                        else:
+                                            st.info("👏 ¡Bien hecho! Tienes premio.")
+                                    else:
+                                        st.warning(f"No tienes premio. El mínimo para ganar en {resultado['modalidad']} son 4 aciertos.")
+                else:
+                    st.error("❌ No se pudieron obtener los resultados. Verifica que haya datos cargados.")
+    
+    # ========================================================================
+    # TAB 3: ANÁLISIS
+    # ========================================================================
+    
+    with tab3:
         st.markdown("## Análisis Estadístico Detallado")
         
         data = st.session_state.current_data
@@ -1959,10 +2187,10 @@ def main():
             st.dataframe(pares_df, width='stretch', hide_index=True)
     
     # ========================================================================
-    # TAB 3: VISUALIZACIONES
+    # TAB 4: VISUALIZACIONES
     # ========================================================================
     
-    with tab3:
+    with tab4:
         st.markdown("## Visualizaciones Interactivas")
         
         data = st.session_state.current_data
@@ -1987,10 +2215,10 @@ def main():
         )
     
     # ========================================================================
-    # TAB 4: VALIDACIÓN TEMPORAL
+    # TAB 5: VALIDACIÓN TEMPORAL
     # ========================================================================
     
-    with tab4:
+    with tab5:
         st.markdown("## Validación Temporal Walk-Forward")
         
         st.info(
@@ -2176,10 +2404,10 @@ def main():
                 st.error(f"Error en validación: {str(e)}")
     
     # ========================================================================
-    # TAB 5: HISTORIAL
+    # TAB 6: HISTORIAL
     # ========================================================================
     
-    with tab5:
+    with tab6:
         st.markdown("## Historial de Predicciones")
         
         if len(st.session_state.historial) == 0:
