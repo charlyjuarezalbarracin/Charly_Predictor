@@ -34,7 +34,9 @@ env/
 
 # Data files (comentar si quieres hacer commit de tus datos)
 data/*.csv
+!data/quini6_historico.csv
 data/*.json
+!data/pozos_actuales.json
 !data/.gitkeep
 
 # Config files personalizados
