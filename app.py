@@ -15,7 +15,7 @@ from pathlib import Path
 
 # Importaciones del core
 from core.data import DataLoader
-from core.analysis import FrequencyAnalyzer, CorrelationAnalyzer, PatternAnalyzer, AdaptiveWindowAnalyzer
+from core.analysis import FrequencyAnalyzer, CorrelationAnalyzer, PatternAnalyzer
 from core.scoring import UnifiedScorer
 from core.generator import StrategyManager, GenerationStrategy, PortfolioGenerator
 from core.backtesting import WalkForwardBacktester
@@ -750,6 +750,26 @@ st.markdown("""
             grid-template-columns: repeat(2, 1fr);
         }
     }
+    
+    /* Estilos compactos para UI minimalista */
+    .stCheckbox label {
+        font-size: 0.85rem !important;
+        font-weight: 500 !important;
+    }
+    
+    .stSlider label {
+        font-size: 0.8rem !important;
+        font-weight: 500 !important;
+    }
+    
+    [data-testid="stExpander"] {
+        border: none !important;
+    }
+    
+    [data-testid="stExpander"] summary {
+        font-size: 0.85rem !important;
+        font-weight: 500 !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -949,6 +969,151 @@ def ejecutar_analisis(_data):
     pattern_analyzer.analyze(_data)
     
     return freq_analyzer, corr_analyzer, pattern_analyzer
+
+
+def mostrar_analisis_regresion_equilibrio(regression_analyzer):
+    """Muestra el análisis de regresión al equilibrio de forma compacta"""
+    summary = regression_analyzer.get_summary()
+    
+    deseq = summary['desequilibrios_detectados']
+    hay_desequilibrios = any(deseq.values())
+    
+    if not hay_desequilibrios:
+        st.info("✓ No se detectaron desequilibrios significativos. Sistema en equilibrio normal.")
+        return
+    
+    st.warning("⚠️ Desequilibrios detectados - Sistema aplicará correcciones automáticas")
+    
+    corr = summary['correcciones_aplicar']
+    metricas = summary['metricas']
+    
+    # Mostrar en formato compacto
+    cols = st.columns(3)
+    
+    # Paridad(cont.)
+    with cols[0]:
+        if deseq['paridad']:
+            desbalance_pct = abs(metricas['desbalance_pares']) * 100
+            st.markdown(f"**Pares/Impares**")
+            st.markdown(f"Desbalance: {desbalance_pct:.1f}%")
+            if corr['paridad']:
+                st.markdown(f"→ {corr['paridad'].replace('_', ' ').title()}")
+        else:
+            st.markdown("**Pares/Impares**")
+            st.markdown("✓ En equilibrio")
+    
+    # Suma
+    with cols[1]:
+        if deseq['suma']:
+            z_score = metricas['z_score_suma']
+            st.markdown(f"**Suma Total**")
+            st.markdown(f"Z-Score: {z_score:+.2f}σ")
+            if corr['suma']:
+                st.markdown(f"→ {corr['suma'].replace('_', ' ').title()}")
+                if metricas['suma_objetivo']:
+                    st.markdown(f"Objetivo: ~{metricas['suma_objetivo']:.0f}")
+        else:
+            st.markdown("**Suma Total**")
+            st.markdown("✓ En equilibrio")
+    
+    # Rangos
+    with cols[2]:
+        if deseq['rangos']:
+            st.markdown(f"**Rangos**")
+            for rango, accion in corr['rangos'].items():
+                rango_nombre = rango.replace('rango_', '').title()
+                st.markdown(f"{rango_nombre}: {accion}")
+        else:
+            st.markdown("**Rangos**")
+            st.markdown("✓ En equilibrio")
+
+
+def mostrar_analisis_resonancia_ciclos(cycle_resonance_analyzer):
+    """Muestra el análisis de resonancia de ciclos de forma compacta"""
+    summary = cycle_resonance_analyzer.get_summary()
+    
+    # Información general
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.metric(
+            "En Ventana Óptima",
+            summary['total_en_ventana_optima'],
+            help="Números en su momento ideal de aparición"
+        )
+    
+    with col2:
+        st.metric(
+            "Sweet Spot",
+            summary['total_en_sweet_spot'],
+            help="Números en el punto perfecto del ciclo"
+        )
+    
+    with col3:
+        st.metric(
+            "Mega Atrasados",
+            summary['total_mega_atrasados'],
+            help="Números muy atrasados (Z > 3.0)"
+        )
+    
+    # Mostrar números destacados
+    if summary['numeros_sweet_spot']:
+        st.success(f"**Sweet Spot:** {', '.join(map(str, summary['numeros_sweet_spot'][:10]))}")
+    
+    if summary['numeros_mega_atrasados']:
+        st.warning(f"**Mega Atrasados:** {', '.join(map(str, summary['numeros_mega_atrasados']))}")
+    
+    # Top 10 por resonancia
+    with st.expander("Ver Top 10 por Resonancia"):
+        top = summary['top_resonancia']
+        for i, (num, score, z) in enumerate(top, 1):
+            st.markdown(f"{i}. **Número {num}** - Score: {score:.2f} (Z: {z:+.2f}σ)")
+
+
+def mostrar_analisis_multi_timeframe(multi_timeframe_analyzer):
+    """Muestra el análisis multi-timeframe de forma compacta"""
+    summary = multi_timeframe_analyzer.get_summary()
+    
+    # Información general
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.metric(
+            "Convergentes 100%",
+            summary['total_convergentes'],
+            help="Números en top 15 de TODAS las ventanas temporales"
+        )
+    
+    with col2:
+        st.metric(
+            "Parciales 60-80%",
+            summary['total_parciales'],
+            help="Números en top 15 de 3-4 ventanas"
+        )
+    
+    with col3:
+        st.metric(
+            "Divergentes <60%",
+            summary['total_divergentes'],
+            help="Números en pocas o ninguna ventana"
+        )
+    
+    # Mostrar números convergentes
+    if summary['numeros_convergentes']:
+        st.success(f"**Convergentes:** {', '.join(map(str, summary['numeros_convergentes']))}")
+    else:
+        st.info("No hay números con convergencia 100% en este momento")
+    
+    # Top 10 por convergencia
+    with st.expander("Ver Top 10 por Convergencia"):
+        top = summary['top_convergencia']
+        ventanas_str = f"Ventanas: {summary['ventanas_analizadas']}"
+        st.caption(ventanas_str)
+        for i, (num, score, ventanas) in enumerate(top, 1):
+            pct = score * 100
+            st.markdown(f"{i}. **Número {num}** - {ventanas}/{len(summary['ventanas_analizadas'])} ventanas ({pct:.0f}%)")
+
+
 
 
 # ============================================================================
@@ -1360,12 +1525,51 @@ def main():
         st.markdown("### Parámetros")
         
         with st.expander("Avanzados"):
-            st.markdown("#### Optimizaciones")
+            st.markdown("#### Optimizaciones Avanzadas")
             
-            usar_ventanas_adaptativas = st.checkbox(
-                "Usar ventanas temporales adaptativas",
+            usar_regresion_equilibrio = st.checkbox(
+                "Regresión al Equilibrio (IDEA #3)",
+                value=True,
+                help="Detecta desequilibrios en pares/impares, sumas y rangos, y ajusta predicciones automáticamente"
+            )
+            
+            # Parámetros de Regresión al Equilibrio (solo si está activado)
+            if usar_regresion_equilibrio:
+                st.markdown("##### Configuración Regresión")
+                
+                ventana_regresion = st.slider(
+                    "Ventana de Análisis (sorteos)",
+                    min_value=8,
+                    max_value=120,
+                    value=16,
+                    step=4,
+                    help="Sorteos recientes (8 sorteos = 1 semana, 2 sorteos/semana). Default: 16 = 2 semanas"
+                )
+                
+                umbral_regresion = st.slider(
+                    "Umbral de Desbalance (%)",
+                    min_value=5,
+                    max_value=25,
+                    value=12,
+                    step=1,
+                    help="% de desviación para activar correcciones. Menor = más sensible"
+                )
+            else:
+                ventana_regresion = 16
+                umbral_regresion = 12
+            
+            st.markdown("---")
+            
+            usar_resonancia_ciclos = st.checkbox(
+                "Resonancia de Ciclos (IDEA #1)",
                 value=False,
-                help="Cada número usará la ventana temporal que mejor lo predice"
+                help="Detecta números en su 'ventana óptima' según análisis de ciclos. Identifica números a punto de salir."
+            )
+            
+            usar_multi_timeframe = st.checkbox(
+                "Multi-Timeframe (IDEA #2)",
+                value=False,
+                help="Analiza señales convergentes en ventanas temporales: 10, 20, 50, 100, 200 sorteos. Boost a números consistentes."
             )
             
             st.markdown("#### Pesos de Scoring")
@@ -1469,8 +1673,54 @@ def main():
             'peso_tendencia': peso_tendencia
         }
         
-        scorer = UnifiedScorer(pesos_custom)
-        scores = scorer.calculate_scores(freq_analyzer)
+        scorer = UnifiedScorer(
+            pesos_custom, 
+            use_regression_equilibrium=usar_regresion_equilibrio,
+            use_cycle_resonance=usar_resonancia_ciclos,
+            use_multi_timeframe=usar_multi_timeframe
+        )
+        
+        regression_analyzer = None
+        cycle_resonance_analyzer = None
+        multi_timeframe_analyzer = None
+        
+        # Si usa regresión al equilibrio, configurar parámetros personalizados
+        if usar_regresion_equilibrio:
+            from core.analysis import RegressionEquilibriumAnalyzer
+            regression_analyzer = RegressionEquilibriumAnalyzer()
+            regression_analyzer.ventana_analisis = ventana_regresion
+            regression_analyzer.umbral_desbalance = umbral_regresion / 100.0
+        
+        # Si usa resonancia de ciclos, configurar analizador
+        if usar_resonancia_ciclos:
+            from core.analysis import CycleResonanceAnalyzer
+            cycle_resonance_analyzer = CycleResonanceAnalyzer()
+        
+        # Si usa multi-timeframe, configurar analizador
+        if usar_multi_timeframe:
+            from core.analysis import MultiTimeframeAnalyzer
+            multi_timeframe_analyzer = MultiTimeframeAnalyzer()
+        
+        # Calcular scores con todos los analizadores activos
+        scores = scorer.calculate_scores(
+            freq_analyzer,
+            regression_analyzer=regression_analyzer,
+            cycle_resonance_analyzer=cycle_resonance_analyzer,
+            multi_timeframe_analyzer=multi_timeframe_analyzer
+        )
+        
+        # Mostrar análisis si están activos
+        if usar_regresion_equilibrio and regression_analyzer:
+            st.markdown("### Análisis de Regresión al Equilibrio")
+            mostrar_analisis_regresion_equilibrio(regression_analyzer)
+        
+        if usar_resonancia_ciclos and cycle_resonance_analyzer:
+            st.markdown("### Análisis de Resonancia de Ciclos")
+            mostrar_analisis_resonancia_ciclos(cycle_resonance_analyzer)
+        
+        if usar_multi_timeframe and multi_timeframe_analyzer:
+            st.markdown("### Análisis Multi-Timeframe")
+            mostrar_analisis_multi_timeframe(multi_timeframe_analyzer)
         
         # Botón de generar predicción
         st.markdown("## Generar Predicción")
@@ -1790,6 +2040,29 @@ def main():
                 help="Cuánto deslizar la ventana en cada iteración"
             )
         
+        st.markdown("---")
+        
+        # Configuración de IDEAS para Walk-Forward
+        usar_ideas_walkforward = st.checkbox(
+            "Usar IDEAS en validación",
+            value=False,
+            help="Aplica las optimizaciones avanzadas (IDEAS) durante la validación Walk-Forward"
+        )
+        
+        if usar_ideas_walkforward:
+            ideas_activas = []
+            if usar_regresion_equilibrio:
+                ideas_activas.append("IDEA #3 (Regresión)")
+            if usar_resonancia_ciclos:
+                ideas_activas.append("IDEA #1 (Resonancia)")
+            if usar_multi_timeframe:
+                ideas_activas.append("IDEA #2 (Multi-Timeframe)")
+            
+            if ideas_activas:
+                st.info(f"✓ Se usarán: {', '.join(ideas_activas)}")
+            else:
+                st.warning("⚠️ Ninguna IDEA activada en Parámetros → Avanzados")
+        
         if st.button("Ejecutar Validación Walk-Forward", type="primary"):
             try:
                 with st.spinner("Ejecutando validación temporal..."):
@@ -1804,18 +2077,27 @@ def main():
                         'peso_tendencia': peso_tendencia
                     }
                     
-                    # Crear backtester
+                    # Crear backtester con configuración de IDEAS
                     wf_backtester = WalkForwardBacktester(
                         train_window=ventana_train,
                         test_window=ventana_test,
-                        step_size=step_size
+                        step_size=step_size,
+                        use_ideas=usar_ideas_walkforward,
+                        use_idea1=usar_resonancia_ciclos,
+                        use_idea2=usar_multi_timeframe,
+                        use_idea3=usar_regresion_equilibrio,
+                        idea3_ventana=ventana_regresion if usar_regresion_equilibrio else 16,
+                        idea3_umbral=umbral_regresion / 100.0 if usar_regresion_equilibrio else 0.12
                     )
                     
                     # Ejecutar
                     results = wf_backtester.run_walk_forward(data, pesos_validar)
                     
                     # Mostrar resultados
-                    st.success("Validación completada")
+                    if usar_ideas_walkforward and ideas_activas:
+                        st.success(f"✓ Validación completada con {', '.join(ideas_activas)}")
+                    else:
+                        st.success("Validación completada (sistema base)")
                     
                     summary = results['summary']
                     

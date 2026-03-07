@@ -12,6 +12,8 @@ import re
 import csv
 from datetime import datetime
 from pathlib import Path
+import requests
+from bs4 import BeautifulSoup
 
 def configurar_driver():
     chrome_options = Options()
@@ -20,11 +22,18 @@ def configurar_driver():
     chrome_options.add_argument('--disable-dev-shm-usage')
     chrome_options.add_argument('--window-size=1920,1080')
     chrome_options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36')
+    chrome_options.add_argument('--disable-blink-features=AutomationControlled')
+    chrome_options.add_argument('--disable-extensions')
+    chrome_options.page_load_strategy = 'eager'  # No esperar a que carguen todos los recursos
     
-    return webdriver.Chrome(
+    driver = webdriver.Chrome(
         service=Service(ChromeDriverManager().install()),
         options=chrome_options
     )
+    driver.set_page_load_timeout(30)  # Timeout de 30 segundos para carga de página
+    driver.implicitly_wait(10)  # Espera implícita de 10 segundos para elementos
+    
+    return driver
 
 def parse_fecha_quiniya(fecha_str):
     """
@@ -296,18 +305,128 @@ def actualizar_historico_csv(archivo='data/quini6_historico.csv'):
     finally:
         driver.quit()
 
-def obtener_pozos_ultimo_sorteo():
+def obtener_pozos_rapido():
     """
-    Obtiene los pozos actuales del último sorteo desde /sorteos/ultimo
+    Versión OPTIMIZADA: Obtiene pozos usando requests + BeautifulSoup (10-20x más rápido que Selenium)
     Retorna: dict con pozos de Tradicional, Segunda, Revancha y Siempre Sale
     """
-    driver = configurar_driver()
-    
     try:
         url = "https://quiniya.com.ar/sorteos/ultimo"
         print(f"\nAccediendo a: {url}")
-        driver.get(url)
-        time.sleep(4)
+        
+        # Request HTTP simple (sin navegador)
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+        response = requests.get(url, headers=headers, timeout=10)
+        response.raise_for_status()
+        
+        print("Página cargada, parseando HTML...")
+        soup = BeautifulSoup(response.content, 'html.parser')
+        
+        pozos = {
+            'Tradicional': {'premio': None, 'ganadores': None},
+            'Segunda': {'premio': None, 'ganadores': None},
+            'Revancha': {'premio': None, 'ganadores': None},
+            'SiempreSale': {'premio': None, 'ganadores': None}
+        }
+        
+        # Buscar todos los h2 (títulos de modalidades)
+        headers_h2 = soup.find_all('h2', class_='text-center')
+        
+        for h2 in headers_h2:
+            titulo = h2.get_text().strip().lower()
+            
+            # Encontrar la tabla más cercana después de este h2
+            parent = h2.find_parent('div', class_='shadow')
+            if not parent:
+                continue
+            
+            tabla = parent.find('table', class_='table')
+            if not tabla:
+                continue
+            
+            # Determinar modalidad
+            modalidad_key = None
+            if 'tradicional' in titulo and 'primer' in titulo:
+                modalidad_key = 'Tradicional'
+                aciertos_buscar = '6'
+            elif 'segunda' in titulo:
+                modalidad_key = 'Segunda'
+                aciertos_buscar = '6'
+            elif 'revancha' in titulo:
+                modalidad_key = 'Revancha'
+                aciertos_buscar = '6'
+            elif 'siempre sale' in titulo:
+                modalidad_key = 'SiempreSale'
+                aciertos_buscar = '5'  # Siempre Sale usa 5 aciertos
+            
+            if not modalidad_key:
+                continue
+            
+            # Buscar la primera fila con aciertos correctos
+            filas = tabla.find('tbody').find_all('tr')
+            for fila in filas:
+                celdas = fila.find_all('td')
+                if len(celdas) >= 3:
+                    aciertos = celdas[0].get_text().strip()
+                    ganadores = celdas[1].get_text().strip()
+                    premio = celdas[2].get_text().strip()
+                    
+                    if aciertos == aciertos_buscar:
+                        # Limpiar premio: remover separadores de miles (.) y descartar centavos (,XX)
+                        # Ej: "14.589.562,05" → "14589562"
+                        premio_limpio = premio.replace('.', '').split(',')[0].strip()
+                        
+                        pozos[modalidad_key] = {
+                            'premio': premio_limpio,
+                            'ganadores': ganadores
+                        }
+                        print(f"  {modalidad_key}: ${premio_limpio} - {ganadores}")
+                        break
+        
+        # Verificar cuántos pozos se obtuvieron
+        pozos_count = sum(1 for v in pozos.values() if v and v.get('premio'))
+        print(f"\n✓ Pozos obtenidos: {pozos_count}/4")
+        
+        if pozos_count < 4:
+            print("⚠ No se obtuvieron todos los pozos con requests, intentando con Selenium...")
+            return None  # Trigger fallback a Selenium
+        
+        return pozos
+    
+    except Exception as e:
+        print(f"✗ Error con método rápido: {e}")
+        return None
+
+def obtener_pozos_ultimo_sorteo():
+    """
+    Obtiene los pozos actuales del último sorteo desde /sorteos/ultimo
+    NOTA: Primero intenta con requests (rápido), si falla usa Selenium (lento pero robusto)
+    Retorna: dict con pozos de Tradicional, Segunda, Revancha y Siempre Sale
+    """
+    # INTENTO 1: Método rápido con requests + BeautifulSoup
+    pozos = obtener_pozos_rapido()
+    if pozos:
+        return pozos
+    
+    # INTENTO 2: Fallback a Selenium (más lento pero más robusto)
+    print("\n⚙ Usando método alternativo con Selenium...")
+    driver = None
+    
+    try:
+        driver = configurar_driver()
+        url = "https://quiniya.com.ar/sorteos/ultimo"
+        print(f"\nAccediendo a: {url}")
+        
+        try:
+            driver.get(url)
+            print("Página cargada, esperando elementos...")
+            time.sleep(2)  # Reducido de 3 a 2 segundos
+            print("Buscando secciones...")
+        except Exception as e:
+            print(f"✗ Error al cargar la página: {e}")
+            return None
         
         pozos = {
             'Tradicional': {'premio': None, 'ganadores': None},
@@ -320,9 +439,15 @@ def obtener_pozos_ultimo_sorteo():
         page_html = driver.page_source
         
         # Buscar todas las secciones con encabezados
-        sections = driver.find_elements(By.TAG_NAME, 'section')
+        try:
+            sections = driver.find_elements(By.TAG_NAME, 'section')
+            print(f"Secciones encontradas: {len(sections)}")
+        except Exception as e:
+            print(f"Error buscando secciones: {e}")
+            sections = []
         
-        for section in sections:
+        pozos_count = 0
+        for idx, section in enumerate(sections):
             try:
                 section_text = section.text.lower()
                 
@@ -340,34 +465,47 @@ def obtener_pozos_ultimo_sorteo():
                 es_revancha = 'revancha' in section_text
                 es_siempre_sale = 'siempre sale' in section_text
                 
+                modalidad_detectada = None
+                if es_tradicional:
+                    modalidad_detectada = "Tradicional"
+                elif es_segunda:
+                    modalidad_detectada = "Segunda"
+                elif es_revancha:
+                    modalidad_detectada = "Revancha"
+                elif es_siempre_sale:
+                    modalidad_detectada = "Siempre Sale"
+                
+                if modalidad_detectada:
+                    print(f"  Sección {idx+1}: {modalidad_detectada} detectado")
+                
                 for fila in filas:
                     try:
                         celdas = fila.find_elements(By.TAG_NAME, 'td')
                         if len(celdas) >= 3:
                             aciertos = celdas[0].text.strip()
                             col2_texto = celdas[1].text.strip()
-                            col2_lower = col2_texto.lower()
                             premio_texto = celdas[2].text.strip()
                             
-                            # Limpiar el número (quitar puntos de miles)
-                            premio = premio_texto.replace('.', '').replace('$', '').strip()
+                            # Limpiar el número: remover $ y separadores de miles (.), descartar centavos (,XX)
+                            # Ej: "$14.589.562,05" → "14589562"
+                            premio = premio_texto.replace('$', '').replace('.', '').split(',')[0].strip()
                             
-                            # Tradicional: 6 aciertos con "Pozo Vacante"
-                            if es_tradicional and aciertos == '6' and 'pozo vacante' in col2_lower and pozos['Tradicional']['premio'] is None:
+                            # Tradicional: primer premio de 6 aciertos (pozo vacante o con ganadores)
+                            if es_tradicional and aciertos == '6' and pozos['Tradicional']['premio'] is None:
                                 pozos['Tradicional'] = {'premio': premio, 'ganadores': col2_texto}
                                 print(f"  Tradicional: ${premio} - {col2_texto}")
                             
-                            # Segunda: 6 aciertos con "Pozo Vacante"
-                            elif es_segunda and aciertos == '6' and 'pozo vacante' in col2_lower and pozos['Segunda']['premio'] is None:
+                            # Segunda: primer premio de 6 aciertos (pozo vacante o con ganadores)
+                            elif es_segunda and aciertos == '6' and pozos['Segunda']['premio'] is None:
                                 pozos['Segunda'] = {'premio': premio, 'ganadores': col2_texto}
                                 print(f"  Segunda: ${premio} - {col2_texto}")
                             
-                            # Revancha: 6 aciertos (primer valor)
+                            # Revancha: primer premio de 6 aciertos
                             elif es_revancha and aciertos == '6' and pozos['Revancha']['premio'] is None:
                                 pozos['Revancha'] = {'premio': premio, 'ganadores': col2_texto}
                                 print(f"  Revancha: ${premio} - {col2_texto}")
                             
-                            # Siempre Sale: 5 aciertos
+                            # Siempre Sale: primer premio de 5 aciertos
                             elif es_siempre_sale and aciertos == '5' and pozos['SiempreSale']['premio'] is None:
                                 pozos['SiempreSale'] = {'premio': premio, 'ganadores': col2_texto}
                                 print(f"  Siempre Sale: ${premio} - {col2_texto}")
@@ -411,19 +549,18 @@ def obtener_pozos_ultimo_sorteo():
                                 if len(celdas) >= 3:
                                     aciertos = celdas[0].text.strip()
                                     col2_texto = celdas[1].text.strip()
-                                    col2_lower = col2_texto.lower()
                                     premio_texto = celdas[2].text.strip()
                                     
-                                    premio = premio_texto.replace('.', '').replace('$', '').strip()
+                                    # Limpiar: remover $ y separadores de miles (.), descartar centavos (,XX)
+                                    premio = premio_texto.replace('$', '').replace('.', '').split(',')[0].strip()
                                     
-                                    # Identificar según título y contenido
-                                    if aciertos == '6' and 'pozo vacante' in col2_lower:
-                                        if 'tradicional' in titulo and pozos['Tradicional']['premio'] is None:
-                                            pozos['Tradicional'] = {'premio': premio, 'ganadores': col2_texto}
-                                            print(f"  Tradicional: ${premio} - {col2_texto}")
-                                        elif 'segunda' in titulo and pozos['Segunda']['premio'] is None:
-                                            pozos['Segunda'] = {'premio': premio, 'ganadores': col2_texto}
-                                            print(f"  Segunda: ${premio} - {col2_texto}")
+                                    # Identificar según título - capturar SIEMPRE el primer premio de 6/5 aciertos
+                                    if aciertos == '6' and 'tradicional' in titulo and pozos['Tradicional']['premio'] is None:
+                                        pozos['Tradicional'] = {'premio': premio, 'ganadores': col2_texto}
+                                        print(f"  Tradicional: ${premio} - {col2_texto}")
+                                    elif aciertos == '6' and 'segunda' in titulo and pozos['Segunda']['premio'] is None:
+                                        pozos['Segunda'] = {'premio': premio, 'ganadores': col2_texto}
+                                        print(f"  Segunda: ${premio} - {col2_texto}")
                                     elif aciertos == '6' and 'revancha' in titulo and pozos['Revancha']['premio'] is None:
                                         pozos['Revancha'] = {'premio': premio, 'ganadores': col2_texto}
                                         print(f"  Revancha: ${premio} - {col2_texto}")
@@ -454,7 +591,11 @@ def obtener_pozos_ultimo_sorteo():
         return None
     
     finally:
-        driver.quit()
+        if driver:
+            try:
+                driver.quit()
+            except Exception:
+                pass
 
 def main():
     print("="*80)

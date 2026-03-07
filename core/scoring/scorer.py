@@ -7,6 +7,9 @@ from typing import Dict, List, Tuple
 from ..analysis.frequency import FrequencyAnalyzer
 from ..analysis.patterns import PatternAnalyzer
 from ..analysis.correlations import CorrelationAnalyzer
+from ..analysis.regression_equilibrium import RegressionEquilibriumAnalyzer
+from ..analysis.cycle_resonance import CycleResonanceAnalyzer
+from ..analysis.multi_timeframe import MultiTimeframeAnalyzer
 from ..config import DEFAULT_WEIGHTS
 
 
@@ -22,22 +25,34 @@ class UnifiedScorer:
         w5 × co_ocurrencia_favorable
     """
     
-    def __init__(self, weights: Dict = None):
+    def __init__(self, weights: Dict = None, use_regression_equilibrium: bool = False, use_cycle_resonance: bool = False, use_multi_timeframe: bool = False):
         """
         Args:
             weights: Diccionario con pesos para cada componente del score
+            use_regression_equilibrium: Si True, aplica análisis de regresión al equilibrio (IDEA #3)
+            use_cycle_resonance: Si True, aplica análisis de resonancia de ciclos (IDEA #1)
+            use_multi_timeframe: Si True, aplica análisis multi-timeframe (IDEA #2)
         """
         self.weights = weights or DEFAULT_WEIGHTS.copy()
         self.frequency_analyzer = None
         self.pattern_analyzer = None
         self.correlation_analyzer = None
+        self.regression_analyzer = None
+        self.cycle_resonance_analyzer = None
+        self.multi_timeframe_analyzer = None
+        self.use_regression_equilibrium = use_regression_equilibrium
+        self.use_cycle_resonance = use_cycle_resonance
+        self.use_multi_timeframe = use_multi_timeframe
         self.scores = {}
         self.components = {}  # Guardar componentes individuales
     
     def calculate_scores(self, 
                         frequency_analyzer: FrequencyAnalyzer,
                         pattern_analyzer: PatternAnalyzer = None,
-                        correlation_analyzer: CorrelationAnalyzer = None) -> Dict[int, float]:
+                        correlation_analyzer: CorrelationAnalyzer = None,
+                        regression_analyzer: RegressionEquilibriumAnalyzer = None,
+                        cycle_resonance_analyzer: CycleResonanceAnalyzer = None,
+                        multi_timeframe_analyzer: MultiTimeframeAnalyzer = None) -> Dict[int, float]:
         """
         Calcula scores para todos los números usando análisis combinados
         
@@ -45,6 +60,9 @@ class UnifiedScorer:
             frequency_analyzer: Analizador de frecuencias (requerido)
             pattern_analyzer: Analizador de patrones (opcional)
             correlation_analyzer: Analizador de correlaciones (opcional)
+            regression_analyzer: Analizador de regresión al equilibrio (opcional, IDEA #3)
+            cycle_resonance_analyzer: Analizador de resonancia de ciclos (opcional, IDEA #1)
+            multi_timeframe_analyzer: Analizador multi-timeframe (opcional, IDEA #2)
         
         Returns:
             Dict con score para cada número (0-1)
@@ -52,6 +70,15 @@ class UnifiedScorer:
         self.frequency_analyzer = frequency_analyzer
         self.pattern_analyzer = pattern_analyzer
         self.correlation_analyzer = correlation_analyzer
+        self.regression_analyzer = regression_analyzer or (
+            RegressionEquilibriumAnalyzer() if self.use_regression_equilibrium else None
+        )
+        self.cycle_resonance_analyzer = cycle_resonance_analyzer or (
+            CycleResonanceAnalyzer() if self.use_cycle_resonance else None
+        )
+        self.multi_timeframe_analyzer = multi_timeframe_analyzer or (
+            MultiTimeframeAnalyzer() if self.use_multi_timeframe else None
+        )
         
         # Inicializar componentes
         self.components = {
@@ -106,6 +133,54 @@ class UnifiedScorer:
         
         # Normalizar scores finales a rango 0-1
         self.scores = self._normalize_dict(self.scores)
+        
+        # IDEA #3: Aplicar factores de regresión al equilibrio
+        if self.regression_analyzer and self.use_regression_equilibrium:
+            # Analizar desequilibrios
+            regression_data = frequency_analyzer.data
+            self.regression_analyzer.analyze(regression_data)
+            
+            # Aplicar factores de corrección
+            factores = self.regression_analyzer.results.get('factores_correccion', {})
+            
+            for num in range(0, 46):
+                factor = factores.get(num, 1.0)
+                self.scores[num] = self.scores[num] * factor
+            
+            # Re-normalizar después de aplicar factores
+            self.scores = self._normalize_dict(self.scores)
+        
+        # IDEA #1: Aplicar factores de resonancia de ciclos
+        if self.cycle_resonance_analyzer and self.use_cycle_resonance:
+            # Analizar resonancia
+            resonance_data = frequency_analyzer.data
+            self.cycle_resonance_analyzer.analyze(resonance_data)
+            
+            # Aplicar factores de resonancia
+            factores_resonancia = self.cycle_resonance_analyzer.results.get('scores_resonancia', {})
+            
+            for num in range(0, 46):
+                factor = factores_resonancia.get(num, 1.0)
+                self.scores[num] = self.scores[num] * factor
+            
+            # Re-normalizar después de aplicar factores
+            self.scores = self._normalize_dict(self.scores)
+        
+        # IDEA #2: Aplicar factores de convergencia multi-timeframe
+        if self.multi_timeframe_analyzer and self.use_multi_timeframe:
+            # Analizar convergencia
+            mtf_data = frequency_analyzer.data
+            self.multi_timeframe_analyzer.analyze(mtf_data)
+            
+            # Aplicar factores de boost
+            factores_mtf = self.multi_timeframe_analyzer.results.get('factores_boost', {})
+            
+            for num in range(0, 46):
+                factor = factores_mtf.get(num, 1.0)
+                self.scores[num] = self.scores[num] * factor
+            
+            # Re-normalizar después de aplicar factores
+            self.scores = self._normalize_dict(self.scores)
         
         return self.scores
     

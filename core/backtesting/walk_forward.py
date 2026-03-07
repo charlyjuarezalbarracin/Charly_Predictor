@@ -5,9 +5,12 @@ Simula condiciones reales de predicción con ventana de entrenamiento deslizante
 
 import pandas as pd
 import numpy as np
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Optional
 from ..data.loader import DataLoader
 from ..analysis.frequency import FrequencyAnalyzer
+from ..analysis.cycle_resonance import CycleResonanceAnalyzer
+from ..analysis.regression_equilibrium import RegressionEquilibriumAnalyzer
+from ..analysis.multi_timeframe import MultiTimeframeAnalyzer
 from ..scoring.scorer import UnifiedScorer
 from ..generator.combination import CombinationGenerator
 
@@ -31,18 +34,38 @@ class WalkForwardBacktester:
     def __init__(self, 
                  train_window: int = 200,
                  test_window: int = 10,
-                 step_size: int = 10):
+                 step_size: int = 10,
+                 use_ideas: bool = False,
+                 use_idea1: bool = False,
+                 use_idea2: bool = False,
+                 use_idea3: bool = False,
+                 idea3_ventana: int = 16,
+                 idea3_umbral: float = 0.12):
         """
         Args:
             train_window: Tamaño de ventana de entrenamiento
             test_window: Tamaño de ventana de test
             step_size: Cuánto deslizar la ventana en cada iteración
+            use_ideas: Si True, usa la configuración de IDEAS especificada
+            use_idea1: Activar Resonancia de Ciclos
+            use_idea2: Activar Multi-Timeframe
+            use_idea3: Activar Regresión al Equilibrio
+            idea3_ventana: Ventana de análisis para IDEA #3 (default: 16 = 2 semanas)
+            idea3_umbral: Umbral de desbalance para IDEA #3 (default: 0.12 = 12%)
         """
         self.train_window = train_window
         self.test_window = test_window
         self.step_size = step_size
         self.results = []
         self.period_results = []
+        
+        # Configuración de IDEAS
+        self.use_ideas = use_ideas
+        self.use_idea1 = use_idea1 if use_ideas else False
+        self.use_idea2 = use_idea2 if use_ideas else False
+        self.use_idea3 = use_idea3 if use_ideas else False
+        self.idea3_ventana = idea3_ventana
+        self.idea3_umbral = idea3_umbral
     
     def run_walk_forward(self, 
                         data: pd.DataFrame,
@@ -152,8 +175,37 @@ class WalkForwardBacktester:
         freq_analyzer = FrequencyAnalyzer()
         freq_analyzer.analyze(train_data)
         
-        scorer = UnifiedScorer(weights)
-        scores = scorer.calculate_scores(freq_analyzer)
+        # Crear analizadores según configuración de IDEAS
+        cycle_analyzer = None
+        mtf_analyzer = None
+        regression_analyzer = None
+        
+        if self.use_ideas:
+            if self.use_idea1:
+                cycle_analyzer = CycleResonanceAnalyzer()
+            
+            if self.use_idea2:
+                mtf_analyzer = MultiTimeframeAnalyzer()
+            
+            if self.use_idea3:
+                regression_analyzer = RegressionEquilibriumAnalyzer()
+                regression_analyzer.ventana_analisis = self.idea3_ventana
+                regression_analyzer.umbral_desbalance = self.idea3_umbral
+        
+        # Crear scorer con configuración de IDEAS
+        scorer = UnifiedScorer(
+            weights,
+            use_cycle_resonance=self.use_idea1,
+            use_multi_timeframe=self.use_idea2,
+            use_regression_equilibrium=self.use_idea3
+        )
+        
+        scores = scorer.calculate_scores(
+            freq_analyzer,
+            cycle_resonance_analyzer=cycle_analyzer,
+            multi_timeframe_analyzer=mtf_analyzer,
+            regression_analyzer=regression_analyzer
+        )
         
         # Generar predicciones para cada sorteo de test
         aciertos_periodo = 0
