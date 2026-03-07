@@ -770,6 +770,58 @@ st.markdown("""
         font-size: 0.85rem !important;
         font-weight: 500 !important;
     }
+    
+    /* Deshabilitar input de búsqueda en selectbox - solo selección con mouse/teclado */
+    div[data-baseweb="select"] input {
+        caret-color: transparent !important;
+        pointer-events: none !important;
+        user-select: none !important;
+        cursor: pointer !important;
+        text-shadow: none !important;
+        outline: none !important;
+        border: none !important;
+        box-shadow: none !important;
+        color: inherit !important;
+    }
+    
+    /* Eliminar cualquier decoración naranja */
+    div[data-baseweb="select"] input::before,
+    div[data-baseweb="select"] input::after {
+        display: none !important;
+    }
+    
+    /* Ocultar placeholder y cursor */
+    div[data-baseweb="select"] input::placeholder {
+        opacity: 0 !important;
+    }
+    
+    div[data-baseweb="select"] input:focus {
+        caret-color: transparent !important;
+        outline: none !important;
+        box-shadow: none !important;
+        border-color: transparent !important;
+    }
+    
+    /* Remover outline general del selectbox */
+    div[data-baseweb="select"]:focus-within {
+        outline: none !important;
+        box-shadow: none !important;
+    }
+    
+    /* Ocultar iconos/decoradores dentro del input container */
+    div[data-baseweb="select"] .st-emotion-cache-* {
+        color: inherit !important;
+    }
+    
+    /* Hacer que solo el container sea clickeable */
+    div[data-baseweb="select"] {
+        cursor: pointer !important;
+    }
+    
+    /* Prevenir que se vea el cursor de texto */
+    div[data-testid="stSelectbox"] * {
+        cursor: pointer !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -897,20 +949,53 @@ def formatear_pozo(data):
     except:
         return data, ''
 
-def controlar_boleta(numeros_jugados, data):
+def obtener_fechas_validas(data):
     """
-    Controla una jugada de 6 números contra los últimos 4 sorteos (última fecha)
+    Obtiene las fechas válidas (miércoles y domingos) del dataset ordenadas de más reciente a más antigua
+    
+    Args:
+        data: DataFrame con todos los sorteos históricos
+    
+    Returns:
+        Lista de fechas únicas ordenadas descendentemente
+    """
+    # Obtener fechas únicas y ordenar de más reciente a más antigua
+    fechas_unicas = pd.to_datetime(data['fecha']).dt.date.unique()
+    fechas_ordenadas = sorted(fechas_unicas, reverse=True)
+    
+    # Filtrar solo miércoles (2) y domingos (6)
+    fechas_validas = []
+    for fecha in fechas_ordenadas:
+        dia_semana = pd.Timestamp(fecha).dayofweek
+        if dia_semana in [2, 6]:  # 2=miércoles, 6=domingo
+            fechas_validas.append(fecha)
+    
+    return fechas_validas
+
+
+def controlar_boleta(numeros_jugados, data, fecha_seleccionada=None):
+    """
+    Controla una jugada de 6 números contra los 4 sorteos de una fecha específica
     
     Args:
         numeros_jugados: Lista de 6 números ingresados por el usuario
         data: DataFrame con todos los sorteos históricos
+        fecha_seleccionada: Fecha a controlar (si es None, usa la última fecha)
     
     Returns:
         Lista de 4 dicts con resultados (Tradicional, Segunda, Revancha, Siempre Sale)
     """
-    # Obtener la última fecha (día con 4 sorteos)
-    ultima_fecha = data['fecha'].max()
-    ultimos_sorteos = data[data['fecha'] == ultima_fecha].tail(4)
+    # Obtener la fecha a controlar
+    if fecha_seleccionada is None:
+        fecha_control = data['fecha'].max()
+    else:
+        # Convertir fecha_seleccionada a string si es necesario
+        if hasattr(fecha_seleccionada, 'strftime'):
+            fecha_control = fecha_seleccionada.strftime('%Y-%m-%d')
+        else:
+            fecha_control = str(fecha_seleccionada)
+    
+    ultimos_sorteos = data[data['fecha'] == fecha_control].tail(4)
     
     if len(ultimos_sorteos) != 4:
         return None
@@ -933,7 +1018,7 @@ def controlar_boleta(numeros_jugados, data):
             'numeros_jugados': numeros_jugados,
             'numeros_acertados': numeros_acertados,
             'aciertos': aciertos,
-            'fecha': ultima_fecha
+            'fecha': fecha_control
         })
     
     return resultados
@@ -1980,7 +2065,44 @@ def main():
     
     with tab2:
         st.markdown("## Control de Boleta")
-        st.markdown("Ingresa tus 6 números y verifica cuántos aciertos tuviste en la última fecha.")
+        st.markdown("Ingresa tus 6 números y verifica cuántos aciertos tuviste en una fecha específica.")
+        
+        # Selector de fecha
+        st.markdown("### Selecciona la fecha del sorteo")
+        
+        # CSS para selectbox compacto
+        st.markdown("""
+        <style>
+        div[data-testid="stSelectbox"] {
+            max-width: 250px !important;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+        
+        data = st.session_state.current_data
+        fechas_disponibles = obtener_fechas_validas(data)
+        
+        # Formatear fechas para mostrar con día de la semana
+        opciones_fecha = []
+        for fecha in fechas_disponibles:
+            fecha_dt = pd.Timestamp(fecha)
+            dia_semana = "Miércoles" if fecha_dt.dayofweek == 2 else "Domingo"
+            opciones_fecha.append(f"{dia_semana} {fecha.strftime('%d/%m/%Y')}")
+        
+        # Crear diccionario para mapear opción -> fecha
+        mapa_fechas = dict(zip(opciones_fecha, fechas_disponibles))
+        
+        fecha_seleccionada_str = st.selectbox(
+            "Fecha del sorteo",
+            options=opciones_fecha,
+            index=0,  # Por defecto la más reciente
+            key="control_fecha_selector",
+            label_visibility="collapsed"
+        )
+        
+        fecha_seleccionada = mapa_fechas[fecha_seleccionada_str]
+        
+        st.markdown("<br>", unsafe_allow_html=True)
         
         # Área de ingreso de números
         st.markdown("### Ingresa tus números")
@@ -2078,10 +2200,12 @@ def main():
             else:
                 # Realizar control
                 data = st.session_state.current_data
-                resultados = controlar_boleta(numeros_ingresados, data)
+                resultados = controlar_boleta(numeros_ingresados, data, fecha_seleccionada)
                 
                 if resultados:
-                    st.success(f"✅ Controlando contra los sorteos del {resultados[0]['fecha']}")
+                    fecha_formateada = pd.Timestamp(resultados[0]['fecha']).strftime('%d/%m/%Y')
+                    dia_semana = "Miércoles" if pd.Timestamp(resultados[0]['fecha']).dayofweek == 2 else "Domingo"
+                    st.success(f"✅ Controlando contra los sorteos del {dia_semana} {fecha_formateada}")
                     
                     # Mostrar resultados en 4 tarjetas (2x2)
                     st.markdown("---")

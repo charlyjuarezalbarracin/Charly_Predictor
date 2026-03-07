@@ -25,6 +25,9 @@
 - Solo agregar elementos estrictamente necesarios para el funcionamiento
 - Diseño compacto: tamaños de fuente, padding y márgenes reducidos
 - NO usar expanders para ocultar información importante, todo debe ser visible directamente
+- **COMPONENTES COMPACTOS:** Selectboxes, inputs y controles deben ser delicados y ajustados al contenido (max-width según texto que contienen)
+- **Ejemplo:** Un selectbox de fechas "Miércoles 04/03/2026" debe tener ~250px de ancho, NO ocupar todo el contenedor
+- **SELECTBOX SIMPLE:** Todos los selectbox deben ser combos simples sin campo de búsqueda/input - solo selección con mouse o teclas de dirección
 
 ## 🎯 FILOSOFÍA DEL PROYECTO - SISTEMA PROFESIONAL DE PRODUCCIÓN
 
