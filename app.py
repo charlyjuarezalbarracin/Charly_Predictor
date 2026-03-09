@@ -232,7 +232,7 @@ st.markdown("""
         color: #333333 !important;
         font-size: 1.5rem !important;
         margin-top: 0.8rem !important;
-        margin-bottom: 0.2rem !important;
+        margin-bottom: 0.5rem !important;
         font-weight: 600 !important;
     }
     
@@ -1275,16 +1275,16 @@ def crear_grafico_frecuencias(freq_analyzer):
     # Obtener datos de frecuencia
     freq_data = freq_analyzer.results['frecuencia_absoluta']
     
-    # Crear DataFrame
+    # Crear DataFrame con TODOS los números 0-45
     df = pd.DataFrame(list(freq_data.items()), columns=['Número', 'Frecuencia'])
-    df = df.sort_values('Frecuencia', ascending=False).head(20)
+    df = df.sort_values('Número')
     
     # Crear gráfico con Plotly
     fig = px.bar(
         df, 
         x='Número', 
         y='Frecuencia',
-        title='Top 20 Números Más Frecuentes',
+        title='Frecuencia de Aparición de Números',
         color='Frecuencia',
         color_continuous_scale=[[0, '#FFF8E1'], [0.5, '#FFD54F'], [1, '#F2A100']]
     )
@@ -1295,7 +1295,7 @@ def crear_grafico_frecuencias(freq_analyzer):
         font=dict(color='#333333'),
         height=320,
         title_font=dict(size=16, color='#333333', family='sans-serif'),
-        xaxis=dict(showgrid=False),
+        xaxis=dict(showgrid=False, tickmode='linear', tick0=0, dtick=1),
         yaxis=dict(gridcolor='#f0f0f0')
     )
     
@@ -1308,35 +1308,40 @@ def crear_grafico_calientes_frios(freq_analyzer):
     calientes = [num for num, freq in freq_analyzer.results['numeros_calientes'][:10]]
     frios = [num for num, freq in freq_analyzer.results['numeros_frios'][:10]]
     
+    # Crear lista de TODOS los números 0-45
+    todos_numeros = list(range(46))
+    freq_abs = freq_analyzer.results['frecuencia_absoluta']
+    
+    # Asignar colores según categoría
+    colores = []
+    for n in todos_numeros:
+        if n in calientes:
+            colores.append('#F2A100')  # Naranja para calientes
+        elif n in frios:
+            colores.append('#BDBDBD')  # Gris para fríos
+        else:
+            colores.append('#FFE082')  # Amarillo claro para neutrales
+    
     fig = go.Figure()
     
-    # Calientes
+    # Una sola traza con TODOS los números y frecuencias reales
     fig.add_trace(go.Bar(
-        name='Calientes',
-        x=[str(n) for n in calientes],
-        y=[freq_analyzer.results['frecuencia_absoluta'][n] for n in calientes],
-        marker_color='#F2A100'
-    ))
-    
-    # Fríos
-    fig.add_trace(go.Bar(
-        name='Fríos',
-        x=[str(n) for n in frios],
-        y=[freq_analyzer.results['frecuencia_absoluta'][n] for n in frios],
-        marker_color='#BDBDBD'
+        x=todos_numeros,
+        y=[freq_abs.get(n, 0) for n in todos_numeros],
+        marker_color=colores,
+        showlegend=False
     ))
     
     fig.update_layout(
         title='Números Calientes vs Fríos',
         xaxis_title='Número',
         yaxis_title='Frecuencia',
-        barmode='group',
         plot_bgcolor='white',
         paper_bgcolor='white',
         font=dict(color='#333333'),
         height=320,
         title_font=dict(size=16, color='#333333'),
-        xaxis=dict(showgrid=False),
+        xaxis=dict(showgrid=False, tickmode='linear', tick0=0, dtick=1),
         yaxis=dict(gridcolor='#f0f0f0')
     )
     
@@ -2064,20 +2069,62 @@ def main():
     # ========================================================================
     
     with tab2:
-        st.markdown("## Control de Boleta")
-        st.markdown("Ingresa tus 6 números y verifica cuántos aciertos tuviste en una fecha específica.")
+        # CSS ULTRA ESPECÍFICO para eliminar espacios en Control de Boleta
+        st.markdown("""
+        <style>
+        /* ELIMINAR TODOS los espacios en el tab de Control de Boleta */
+        div[role="tabpanel"][id*="tabpanel-1"] .stVerticalBlock {
+            gap: 0.3rem !important;
+        }
+        div[role="tabpanel"][id*="tabpanel-1"] .stElementContainer {
+            margin-top: 0 !important;
+            margin-bottom: 0 !important;
+        }
+        div[role="tabpanel"][id*="tabpanel-1"] .stMarkdown {
+            margin-top: 0 !important;
+            margin-bottom: 0 !important;
+        }
+        /* h2 - Título principal con espacio abajo (separar sección 1) */
+        div[role="tabpanel"][id*="tabpanel-1"] h2 {
+            margin-bottom: 0.3rem !important;
+            padding-bottom: 0.8rem !important;
+        }
+        /* h3 - Subtítulos de secciones con espacio arriba (separar secciones 2 y 3) */
+        div[role="tabpanel"][id*="tabpanel-1"] h3 {
+            margin-top: 1rem !important;
+            margin-bottom: 0.2rem !important;
+        }
+        div[role="tabpanel"][id*="tabpanel-1"] p {
+            margin-top: 0 !important;
+            margin-bottom: 0.3rem !important;
+        }
+        div[role="tabpanel"][id*="tabpanel-1"] div[data-testid="stLayoutWrapper"] {
+            margin-top: 0 !important;
+            margin-bottom: 0 !important;
+        }
+        </style>
+        """, unsafe_allow_html=True)
         
         # Selector de fecha
-        st.markdown("### Selecciona la fecha del sorteo")
-        
-        # CSS para selectbox compacto
+        # CSS para selectbox compacto y pegado al título
         st.markdown("""
         <style>
         div[data-testid="stSelectbox"] {
             max-width: 250px !important;
+            margin-top: 0 !important;
+            margin-bottom: 0 !important;
+        }
+        div[role="tabpanel"][id*="tabpanel-1"] h3 + div {
+            margin-top: 0 !important;
+        }
+        div[role="tabpanel"][id*="tabpanel-1"] .stSelectbox {
+            margin-top: 0 !important;
+            margin-bottom: 0 !important;
         }
         </style>
         """, unsafe_allow_html=True)
+        
+        st.markdown("### Selecciona la fecha del sorteo")
         
         data = st.session_state.current_data
         fechas_disponibles = obtener_fechas_validas(data)
@@ -2102,33 +2149,32 @@ def main():
         
         fecha_seleccionada = mapa_fechas[fecha_seleccionada_str]
         
-        st.markdown("<br>", unsafe_allow_html=True)
-        
         # Área de ingreso de números
         st.markdown("### Ingresa tus números")
         
-        # CSS para inputs circulares limpios
+        # CSS para inputs circulares compactos SIN ESPACIOS
         st.markdown("""
         <style>
-        /* Contenedor principal de inputs con flexbox */
-        div[data-testid="column"]:has([data-testid="stTextInput"]) {
+        /* ELIMINAR espacios alrededor de inputs */
+        div[role="tabpanel"][id*="tabpanel-1"] div[data-testid="column"]:has([data-testid="stTextInput"]) {
             padding: 0 3px !important;
             min-width: 0 !important;
+            margin: 0 !important;
         }
-        
-        /* Estilos para los text inputs */
-        [data-testid="stTextInput"] {
+        div[role="tabpanel"][id*="tabpanel-1"] [data-testid="stTextInput"] {
             width: 64px !important;
+            margin: 0 !important;
         }
-        [data-testid="stTextInput"] > div {
+        div[role="tabpanel"][id*="tabpanel-1"] [data-testid="stTextInput"] > div {
             width: 64px !important;
-            height: 70px !important;
+            height: 64px !important;
+            margin: 0 !important;
         }
-        [data-testid="stTextInput"] > div > div {
+        div[role="tabpanel"][id*="tabpanel-1"] [data-testid="stTextInput"] > div > div {
             width: 64px !important;
             height: 64px !important;
         }
-        [data-testid="stTextInput"] input {
+        div[role="tabpanel"][id*="tabpanel-1"] [data-testid="stTextInput"] input {
             width: 64px !important;
             height: 64px !important;
             border-radius: 50% !important;
@@ -2142,12 +2188,16 @@ def main():
             line-height: 64px !important;
             box-sizing: border-box !important;
         }
-        [data-testid="stTextInput"] input:focus {
+        div[role="tabpanel"][id*="tabpanel-1"] [data-testid="stTextInput"] input:focus {
             border: 3px solid #F2A100 !important;
             outline: none !important;
         }
-        [data-testid="stTextInput"] label {
+        div[role="tabpanel"][id*="tabpanel-1"] [data-testid="stTextInput"] label {
             display: none !important;
+        }
+        /* Margen entre esferas y botón Verificar */
+        div[role="tabpanel"][id*="tabpanel-1"] button[kind="primary"] {
+            margin-top: 0.5rem !important;
         }
         </style>
         """, unsafe_allow_html=True)
@@ -2182,8 +2232,6 @@ def main():
                     numeros_ingresados.append(0)
             except:
                 numeros_ingresados.append(0)
-        
-        st.markdown("<br>", unsafe_allow_html=True)
         
         # Botón con el mismo ancho que las 6 esferas
         cols_button = st.columns([0.25, 0.5, 0.25])
