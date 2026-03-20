@@ -875,6 +875,109 @@ def cargar_historial_json():
         st.warning(f"No se pudo cargar el historial: {str(e)}")
         return []
 
+def calcular_inversion_portfolio(capital_inicial, pct_pf, tasa_pf, pct_fci_cer, tasa_fci_cer, 
+                                  pct_fci_usd, tasa_fci_usd, inflacion_mensual, retiro_mensual, 
+                                  meses=12, gastos_iniciales=None):
+    """Calcula proyección de inversiones con portfolio diversificado
+    
+    Args:
+        capital_inicial: Capital total a invertir
+        pct_pf: Porcentaje en plazo fijo (0-100)
+        tasa_pf: Tasa mensual plazo fijo (%)
+        pct_fci_cer: Porcentaje en FCI CER (0-100)
+        tasa_fci_cer: Tasa mensual FCI CER (%)
+        pct_fci_usd: Porcentaje en FCI USD (0-100)
+        tasa_fci_usd: Tasa mensual FCI USD (%)
+        inflacion_mensual: Inflación mensual (%)
+        retiro_mensual: Monto fijo de retiro mensual
+        meses: Número de meses a proyectar
+        gastos_iniciales: Dict con {mes: monto} de gastos extraordinarios
+    
+    Returns:
+        pandas.DataFrame con proyección mensual
+    """
+    if gastos_iniciales is None:
+        gastos_iniciales = {}
+    
+    # Nombres de meses en orden
+    meses_nombres = [
+        "ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO",
+        "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"
+    ]
+    
+    # Obtener mes actual (1-12) y calcular índice inicial
+    mes_actual = datetime.now().month
+    mes_inicio = mes_actual - 1
+    
+    # Distribución inicial
+    capital_pf = capital_inicial * (pct_pf / 100)
+    capital_cer = capital_inicial * (pct_fci_cer / 100)
+    capital_usd = capital_inicial * (pct_fci_usd / 100)
+    
+    resultados = []
+    total_rentabilidad = 0
+    total_neto = 0
+    total_gastos = retiro_mensual * meses
+    total_gastos_extra = sum(gastos_iniciales.values()) if gastos_iniciales else 0
+    
+    for i in range(meses):
+        indice_mes = (mes_inicio + i) % 12
+        mes_nombre = meses_nombres[indice_mes]
+        
+        # Capital total al inicio del mes
+        acumulado = capital_pf + capital_cer + capital_usd
+        
+        # Rentabilidad de cada activo
+        rent_pf = capital_pf * (tasa_pf / 100)
+        rent_cer = capital_cer * (tasa_fci_cer / 100)
+        rent_usd = capital_usd * (tasa_fci_usd / 100)
+        
+        rentabilidad_total = rent_pf + rent_cer + rent_usd
+        
+        # Gastos: retiro mensual + gastos extraordinarios
+        gastos_extra = gastos_iniciales.get(i + 1, 0)
+        gastos_mes = retiro_mensual + gastos_extra
+        
+        # Neto del mes
+        neto = rentabilidad_total - gastos_mes
+        
+        # Guardar resultado
+        resultados.append({
+            'Mes': mes_nombre,
+            'Acumulado': acumulado,
+            'TNA': None,  # No aplica en portfolio
+            'Rentabilidad': rentabilidad_total,
+            'Neto': neto,
+            'Gastos': gastos_mes if gastos_mes > 0 else None,
+            'Gastos_extra': gastos_extra if gastos_extra > 0 else None  # Solo gastos extraordinarios
+        })
+        
+        # Actualizar capitales para siguiente mes
+        # Aplicar rentabilidad y restar gasto proporcionalmente
+        capital_pf += rent_pf - (gastos_mes * (pct_pf / 100))
+        capital_cer += rent_cer - (gastos_mes * (pct_fci_cer / 100))
+        capital_usd += rent_usd - (gastos_mes * (pct_fci_usd / 100))
+        
+        # Acumular totales
+        total_rentabilidad += rentabilidad_total
+        total_neto += neto
+    
+    # Capital final
+    capital_final = capital_pf + capital_cer + capital_usd
+    
+    # Agregar fila de totales
+    resultados.append({
+        'Mes': 'Total',
+        'Acumulado': capital_final,
+        'TNA': None,
+        'Rentabilidad': total_rentabilidad,
+        'Neto': total_neto,
+        'Gastos': (total_gastos + total_gastos_extra) if (total_gastos + total_gastos_extra) > 0 else None,
+        'Gastos_extra': total_gastos_extra if total_gastos_extra > 0 else None
+    })
+    
+    return pd.DataFrame(resultados)
+
 def calcular_inversiones(premio, base, tna, meses=12, gastos_iniciales=None):
     """Calcula proyección de inversiones con capitalización mensual
     
@@ -2725,19 +2828,42 @@ def main():
     # ========================================================================
     
     with tab7:
-        st.markdown("## Proyección de Inversiones")
+        st.markdown("""
+        <style>
+        /* Reducir espacio entre labels e inputs en sección inversiones */
+        #inversiones-params {
+            margin-top: -0.5rem !important;
+            margin-bottom: -0.5rem !important;
+        }
+        #inversiones-params p {
+            margin-bottom: 0rem !important;
+        }
+        #inversiones-params div[data-testid="stTextInput"] {
+            margin-top: -0.3rem !important;
+        }
+        #inversiones-params div[data-testid="stNumberInput"] {
+            margin-top: -0.5rem !important;
+        }
+        #inversiones-params label {
+            margin-bottom: 0rem !important;
+        }
+        </style>
+        """, unsafe_allow_html=True)
         
-        st.markdown("---")
+        st.markdown("<h2 style='margin-bottom: 0.5rem;'>Proyección de Inversiones</h2>", unsafe_allow_html=True)
+        
+        st.markdown("<div style='margin: 0.2rem 0;'><hr style='margin: 0;'/></div>", unsafe_allow_html=True)
 
         # Inicializar valores en session_state
         if 'premio_inv' not in st.session_state:
             st.session_state.premio_inv = 7310000000.0
         
-        # Datos iniciales en columnas más compactas
-        col_premio, col_base, col_spacer = st.columns([0.5, 0.5, 2])
+        # Todos los parámetros en una sola fila compacta
+        st.markdown('<div id="inversiones-params">', unsafe_allow_html=True)
+        col_premio, col_base, col_tna, col_meses, col_spacer = st.columns([0.7, 0.7, 0.7, 0.4, 2.2])
         
         with col_premio:
-            st.markdown("Premio")
+            st.markdown('<p style="margin-bottom: 0rem;">Premio</p>', unsafe_allow_html=True)
             
             # Formatear valor actual con puntos de miles
             valor_formateado = f"{int(st.session_state.premio_inv):,}".replace(',', '.')
@@ -2754,24 +2880,15 @@ def main():
             try:
                 premio = float(premio_texto.replace('.', '').replace(',', '.'))
                 st.session_state.premio_inv = premio
-                premio_formateado = f"${premio:,.0f}".replace(',', '.')
-                st.caption(premio_formateado)
             except:
                 premio = st.session_state.premio_inv
-                st.caption("⚠️ Valor inválido")
         
         with col_base:
-            st.markdown("Base")
+            st.markdown('<p style="margin-bottom: 0rem;">Base</p>', unsafe_allow_html=True)
             # BASE se calcula según fórmula: PREMIO - ((PREMIO * 0.9) * 0.31)
             base = premio - ((premio * 0.9) * 0.31)
             base_formateado = f"{base:,.0f}".replace(',', '.')
             st.markdown(f"<div style='padding: 8px 12px; background-color: #f0f2f6; border-radius: 4px; text-align: center; font-size: 16px;'>{base_formateado}</div>", unsafe_allow_html=True)
-            st.caption(f"${base_formateado}")
-        
-        st.markdown("---")
-        
-        # Parámetros de cálculo en columnas MUY compactas
-        col_tna, col_meses, col_spacer2 = st.columns([0.8, 0.8, 3.2])
         
         with col_tna:
             tna_percent = st.number_input(
@@ -2786,14 +2903,15 @@ def main():
         
         with col_meses:
             meses = st.number_input(
-                "Meses a proyectar",
+                "Meses",
                 value=12,
                 min_value=1,
                 max_value=60,
                 step=1
             )
         
-        st.markdown("---")
+        st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown("<div style='margin: 0.2rem 0;'><hr style='margin: 0;'/></div>", unsafe_allow_html=True)
         
         # Inicializar gastos en session_state si no existe
         if 'gastos_inversiones' not in st.session_state:
@@ -2823,7 +2941,30 @@ def main():
         )
         
         # Mostrar tabla EDITABLE
-        st.markdown("### Proyección Mensual")
+        st.markdown("<h3 style='margin-bottom: 0.3rem; margin-top: 0.5rem;'>Proyección Mensual</h3>", unsafe_allow_html=True)
+        
+        # CSS para deshabilitar ordenamiento y compactar tabla
+        st.markdown("""
+        <style>
+        /* Deshabilitar ordenamiento en data_editor */
+        [data-testid="stDataFrameResizable"] [data-testid^="stDataFrameCell"] button {
+            display: none !important;
+        }
+        [data-testid="stDataFrameResizable"] th button {
+            display: none !important;
+        }
+        [data-testid="stDataFrameResizable"] thead button {
+            display: none !important;
+        }
+        div[data-testid="stDataFrameResizable"] button[kind="header"] {
+            display: none !important;
+        }
+        /* Compactar tabla */
+        [data-testid="stDataFrameResizable"] {
+            margin-top: -0.3rem !important;
+        }
+        </style>
+        """, unsafe_allow_html=True)
         
         # Preparar DataFrame para edición (sin fila Total)
         df_editable = df_inversiones[df_inversiones['Mes'] != 'Total'].copy()
@@ -2985,38 +3126,370 @@ def main():
             }
         )
         
-        # Gráfico de evolución
-        st.markdown("### Evolución del Capital")
+        # ====================================================================
+        # PROYECCIÓN CON PORTFOLIO DIVERSIFICADO
+        # ====================================================================
         
-        # Preparar datos para gráfico (excluir Total)
-        df_grafico = df_inversiones_final[df_inversiones_final['Mes'] != 'Total'].copy()
+        st.markdown("<div style='margin: 1.5rem 0 0.2rem 0;'><hr style='margin: 0;'/></div>", unsafe_allow_html=True)
         
-        fig = go.Figure()
+        st.markdown("<h3 style='margin-bottom: 0.3rem; margin-top: 0.5rem;'>Simulación Portfolio Diversificado</h3>", unsafe_allow_html=True)
         
-        fig.add_trace(go.Scatter(
-            x=df_grafico['Mes'],
-            y=df_grafico['Acumulado'],
+        # Inicializar valores en session_state
+        if 'premio_portfolio' not in st.session_state:
+            st.session_state.premio_portfolio = 7310000000.0
+        if 'retiro_mensual' not in st.session_state:
+            st.session_state.retiro_mensual = 20000000.0
+        if 'gastos_portfolio' not in st.session_state:
+            st.session_state.gastos_portfolio = {}
+        
+        # Inputs en una fila compacta
+        col1, col2, col3, col4, col5, col_spacer = st.columns([0.7, 0.7, 0.7, 0.7, 0.4, 1.1])
+        
+        with col1:
+            st.markdown('<p style="margin-bottom: 0rem;">Premio</p>', unsafe_allow_html=True)
+            
+            # Formatear valor actual con puntos de miles
+            valor_premio_formateado = f"{int(st.session_state.premio_portfolio):,}".replace(',', '.')
+            
+            # Input de texto con formato
+            premio_portfolio_texto = st.text_input(
+                "Premio",
+                value=valor_premio_formateado,
+                label_visibility="collapsed",
+                key="premio_portfolio_input"
+            )
+            
+            # Convertir texto a número (removiendo puntos)
+            try:
+                premio_portfolio = float(premio_portfolio_texto.replace('.', '').replace(',', '.'))
+                st.session_state.premio_portfolio = premio_portfolio
+            except:
+                premio_portfolio = st.session_state.premio_portfolio
+        
+        with col2:
+            st.markdown('<p style="margin-bottom: 0rem;">Base</p>', unsafe_allow_html=True)
+            # BASE se calcula según fórmula: PREMIO - ((PREMIO * 0.9) * 0.31)
+            base_portfolio = premio_portfolio - ((premio_portfolio * 0.9) * 0.31)
+            base_portfolio_formateado = f"{base_portfolio:,.0f}".replace(',', '.')
+            st.markdown(f"<div style='padding: 8px 12px; background-color: #f0f2f6; border-radius: 4px; text-align: center; font-size: 16px;'>{base_portfolio_formateado}</div>", unsafe_allow_html=True)
+        
+        with col3:
+            st.markdown('<p style="margin-bottom: 0rem;">Retiro mensual</p>', unsafe_allow_html=True)
+            valor_retiro_formateado = f"{int(st.session_state.retiro_mensual):,}".replace(',', '.')
+            retiro_texto = st.text_input(
+                "Retiro mensual",
+                value=valor_retiro_formateado,
+                label_visibility="collapsed",
+                key="retiro_mensual_input"
+            )
+            try:
+                retiro_mensual = float(retiro_texto.replace('.', '').replace(',', '.'))
+                st.session_state.retiro_mensual = retiro_mensual
+            except:
+                retiro_mensual = st.session_state.retiro_mensual
+        
+        with col4:
+            inflacion = st.number_input(
+                "Inflación mensual (%)",
+                value=3.0,
+                min_value=0.0,
+                max_value=50.0,
+                step=0.5,
+                format="%.2f"
+            )
+        
+        with col5:
+            meses_portfolio = st.number_input(
+                "Meses a proyectar",
+                value=12,
+                min_value=1,
+                max_value=60,
+                step=1,
+                key="meses_portfolio"
+            )
+        
+        # Distribución y tasas con columnas compactas
+        st.markdown('<p style="margin-top: 0.5rem; margin-bottom: 0.3rem; font-weight: 500;">Distribución y tasas</p>', unsafe_allow_html=True)
+        
+        col_pf1, col_pf2, col_cer1, col_cer2, col_usd1, col_usd2, col_spacer2 = st.columns([0.35, 0.35, 0.35, 0.35, 0.35, 0.35, 2.25])
+        
+        with col_pf1:
+            st.markdown('<p style="font-weight: 500; margin-bottom: 0.3rem;">Plazo fijo</p>', unsafe_allow_html=True)
+            pct_pf = st.number_input("Porcentaje (%)", value=30.0, min_value=0.0, max_value=100.0, step=5.0, format="%.1f", key="pct_pf", label_visibility="collapsed")
+        with col_pf2:
+            st.markdown('<p style="font-weight: 500; margin-bottom: 0.3rem; color: transparent;">.</p>', unsafe_allow_html=True)
+            tasa_pf = st.number_input("Tasa mensual (%)", value=7.0, min_value=0.0, max_value=50.0, step=0.5, format="%.2f", key="tasa_pf", label_visibility="collapsed")
+        
+        with col_cer1:
+            st.markdown('<p style="font-weight: 500; margin-bottom: 0.3rem;">FCI CER</p>', unsafe_allow_html=True)
+            pct_cer = st.number_input("Porcentaje (%)", value=30.0, min_value=0.0, max_value=100.0, step=5.0, format="%.1f", key="pct_cer", label_visibility="collapsed")
+        with col_cer2:
+            st.markdown('<p style="font-weight: 500; margin-bottom: 0.3rem; color: transparent;">.</p>', unsafe_allow_html=True)
+            tasa_cer = st.number_input("Tasa mensual (%)", value=3.5, min_value=0.0, max_value=50.0, step=0.5, format="%.2f", key="tasa_cer", label_visibility="collapsed")
+        
+        with col_usd1:
+            st.markdown('<p style="font-weight: 500; margin-bottom: 0.3rem;">FCI USD</p>', unsafe_allow_html=True)
+            pct_usd = st.number_input("Porcentaje (%)", value=40.0, min_value=0.0, max_value=100.0, step=5.0, format="%.1f", key="pct_usd", label_visibility="collapsed")
+        with col_usd2:
+            st.markdown('<p style="font-weight: 500; margin-bottom: 0.3rem; color: transparent;">.</p>', unsafe_allow_html=True)
+            tasa_usd = st.number_input("Tasa mensual (%)", value=0.5, min_value=0.0, max_value=50.0, step=0.5, format="%.2f", key="tasa_usd", label_visibility="collapsed")
+        
+        # Validar que la suma de porcentajes sea 100%
+        suma_pct = pct_pf + pct_cer + pct_usd
+        if abs(suma_pct - 100.0) > 0.1:
+            st.warning(f"⚠️ La suma de porcentajes debe ser 100% (actual: {suma_pct:.1f}%)")
+        
+        # Calcular proyección de portfolio con gastos guardados
+        df_portfolio = calcular_inversion_portfolio(
+            capital_inicial=base_portfolio,
+            pct_pf=pct_pf,
+            tasa_pf=tasa_pf,
+            pct_fci_cer=pct_cer,
+            tasa_fci_cer=tasa_cer,
+            pct_fci_usd=pct_usd,
+            tasa_fci_usd=tasa_usd,
+            inflacion_mensual=inflacion,
+            retiro_mensual=retiro_mensual,
+            meses=meses_portfolio,
+            gastos_iniciales=st.session_state.gastos_portfolio
+        )
+        
+        # Preparar DataFrame para edición (sin fila Total)
+        df_editable_portfolio = df_portfolio[df_portfolio['Mes'] != 'Total'].copy()
+        
+        # Eliminar columna TNA (no aplica en portfolio)
+        df_editable_portfolio = df_editable_portfolio.drop(columns=['TNA'])
+        
+        # Formatear columnas de solo lectura como texto con formato argentino
+        df_display_portfolio = df_editable_portfolio.copy()
+        df_display_portfolio['Acumulado_fmt'] = df_display_portfolio['Acumulado'].apply(lambda x: formato_argentino(x, 2))
+        df_display_portfolio['Rentabilidad_fmt'] = df_display_portfolio['Rentabilidad'].apply(lambda x: formato_argentino(x, 2))
+        df_display_portfolio['Neto_fmt'] = df_display_portfolio['Neto'].apply(lambda x: formato_argentino(x, 2))
+        df_display_portfolio['Gastos_fmt'] = df_display_portfolio['Gastos'].apply(lambda x: formato_argentino(x, 0, signo_pesos=False) if pd.notna(x) and x > 0 else '')
+        # IMPORTANTE: Mostrar solo gastos extraordinarios editables (sin retiro mensual)
+        df_display_portfolio['Gastos_extra_fmt'] = df_display_portfolio['Gastos_extra'].apply(lambda x: formato_argentino(x, 0, signo_pesos=False) if pd.notna(x) and x > 0 else '')
+        
+        # Crear DataFrame para mostrar con columnas formateadas
+        df_para_editar_portfolio = pd.DataFrame({
+            'Mes': df_display_portfolio['Mes'],
+            'Acumulado': df_display_portfolio['Acumulado_fmt'],
+            'Rentabilidad': df_display_portfolio['Rentabilidad_fmt'],
+            'Neto': df_display_portfolio['Neto_fmt'],
+            'Gastos': df_display_portfolio['Gastos_extra_fmt']  # Solo extraordinarios en columna editable
+        })
+        
+        # Configurar columnas editables (solo Gastos es editable)
+        column_config_portfolio = {
+            "Mes": st.column_config.TextColumn("Mes", disabled=True, width="small"),
+            "Acumulado": st.column_config.TextColumn("Acumulado", disabled=True),
+            "Rentabilidad": st.column_config.TextColumn("Rentabilidad", disabled=True),
+            "Neto": st.column_config.TextColumn("Neto", disabled=True),
+            "Gastos": st.column_config.TextColumn(
+                "Gastos",
+                help="Edita el monto de gastos extraordinarios para este mes (formato: 10.000.000)",
+                width="medium"
+            )
+        }
+        
+        # Calcular altura según cantidad de meses
+        num_filas_portfolio = len(df_para_editar_portfolio)
+        
+        # CSS para compactar tabla de portfolio
+        st.markdown("""
+        <style>
+        /* Compactar tabla de portfolio */
+        div[data-testid="stDataFrame"] {
+            margin-top: -0.5rem !important;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+        
+        # Mostrar tabla editable con altura dinámica
+        if num_filas_portfolio <= 12:
+            altura_fila = 35
+            altura_header = 38
+            altura_tabla_portfolio = (num_filas_portfolio * altura_fila) + altura_header + 10
+            df_editado_portfolio = st.data_editor(
+                df_para_editar_portfolio,
+                column_config=column_config_portfolio,
+                use_container_width=True,
+                hide_index=True,
+                num_rows="fixed",
+                height=altura_tabla_portfolio,
+                key="tabla_portfolio"
+            )
+        else:
+            altura_fija = (12 * 35) + 38 + 10
+            df_editado_portfolio = st.data_editor(
+                df_para_editar_portfolio,
+                column_config=column_config_portfolio,
+                use_container_width=True,
+                hide_index=True,
+                num_rows="fixed",
+                height=altura_fija,
+                key="tabla_portfolio"
+            )
+        
+        # Botón para limpiar gastos
+        col_btn1_pf, col_btn2_pf, col_spacer_btn_pf = st.columns([1, 1, 3])
+        with col_btn1_pf:
+            if st.button("Limpiar gastos", type="secondary", key="limpiar_gastos_portfolio"):
+                st.session_state.gastos_portfolio = {}
+                st.rerun()
+        
+        # Extraer gastos editados y actualizar session_state
+        gastos_dict_editado_portfolio = {}
+        cambios_detectados_portfolio = False
+        
+        for idx, row in df_editado_portfolio.iterrows():
+            gastos_str = str(row['Gastos']).strip()
+            mes_num = idx + 1
+            
+            if gastos_str and gastos_str != '':
+                try:
+                    gastos_num = float(gastos_str.replace('.', '').replace(',', '.'))
+                    if gastos_num > 0:
+                        gastos_dict_editado_portfolio[mes_num] = gastos_num
+                        # Comparar con tolerancia para evitar errores de precisión
+                        if mes_num not in st.session_state.gastos_portfolio or \
+                           abs(st.session_state.gastos_portfolio[mes_num] - gastos_num) > 0.01:
+                            cambios_detectados_portfolio = True
+                except:
+                    pass
+        
+        # Detectar gastos eliminados
+        for mes_num in st.session_state.gastos_portfolio:
+            if mes_num not in gastos_dict_editado_portfolio:
+                cambios_detectados_portfolio = True
+                break
+        
+        # Si hay cambios, actualizar session_state y rerun
+        if cambios_detectados_portfolio:
+            st.session_state.gastos_portfolio = gastos_dict_editado_portfolio
+            st.rerun()
+        
+        # Recalcular con gastos actualizados
+        df_portfolio_final = calcular_inversion_portfolio(
+            capital_inicial=base_portfolio,
+            pct_pf=pct_pf,
+            tasa_pf=tasa_pf,
+            pct_fci_cer=pct_cer,
+            tasa_fci_cer=tasa_cer,
+            pct_fci_usd=pct_usd,
+            tasa_fci_usd=tasa_usd,
+            inflacion_mensual=inflacion,
+            retiro_mensual=retiro_mensual,
+            meses=meses_portfolio,
+            gastos_iniciales=st.session_state.gastos_portfolio
+        )
+        
+        # Mostrar fila Total
+        fila_total_portfolio = df_portfolio_final[df_portfolio_final['Mes'] == 'Total'].iloc[0]
+        
+        df_total_portfolio = pd.DataFrame([{
+            'Mes': 'Total',
+            'Acumulado': formato_argentino(fila_total_portfolio['Acumulado'], 2),
+            'Rentabilidad': formato_argentino(fila_total_portfolio['Rentabilidad'], 2),
+            'Neto': formato_argentino(fila_total_portfolio['Neto'], 2),
+            'Gastos': formato_argentino(fila_total_portfolio['Gastos_extra'], 0) if pd.notna(fila_total_portfolio['Gastos_extra']) else ''
+        }])
+        
+        st.dataframe(
+            df_total_portfolio,
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "Mes": st.column_config.TextColumn("Mes", width="small"),
+                "Acumulado": st.column_config.TextColumn("Acumulado"),
+                "Rentabilidad": st.column_config.TextColumn("Rentabilidad"),
+                "Neto": st.column_config.TextColumn("Neto"),
+                "Gastos": st.column_config.TextColumn("Gastos")
+            }
+        )
+        
+        # Resumen de resultados
+        st.markdown('<p style="margin-top: 1rem; margin-bottom: 0.5rem; font-weight: 500;">Resumen</p>', unsafe_allow_html=True)
+        
+        capital_final = fila_total_portfolio['Acumulado']
+        rentabilidad_total = fila_total_portfolio['Rentabilidad']
+        
+        # Calcular valor real ajustado por inflación acumulada
+        inflacion_acumulada = ((1 + inflacion / 100) ** meses_portfolio) - 1
+        capital_real = capital_final / (1 + inflacion_acumulada)
+        
+        col_res1, col_res2, col_res3, col_res4 = st.columns(4)
+        
+        with col_res1:
+            st.metric("Capital final", f"${capital_final:,.0f}".replace(',', '.'))
+        
+        with col_res2:
+            st.metric("Capital real (ajustado)", f"${capital_real:,.0f}".replace(',', '.'))
+        
+        with col_res3:
+            cambio_pct = ((capital_final - base_portfolio) / base_portfolio) * 100
+            st.metric("Variación nominal", f"{cambio_pct:.1f}%")
+        
+        with col_res4:
+            cambio_real_pct = ((capital_real - base_portfolio) / base_portfolio) * 100
+            st.metric("Variación real", f"{cambio_real_pct:.1f}%")
+        
+        # ====================================================================
+        # GRÁFICO COMPARATIVO DE AMBOS MÉTODOS
+        # ====================================================================
+        
+        st.markdown("<div style='margin: 1.5rem 0 0.2rem 0;'><hr style='margin: 0;'/></div>", unsafe_allow_html=True)
+        
+        st.markdown("<h3 style='margin-bottom: 0.5rem; margin-top: 0.5rem;'>Comparación de Métodos</h3>", unsafe_allow_html=True)
+        
+        # Preparar datos para gráfico (excluir Total de ambos)
+        df_grafico_simple = df_inversiones_final[df_inversiones_final['Mes'] != 'Total'].copy()
+        df_grafico_portfolio = df_portfolio_final[df_portfolio_final['Mes'] != 'Total'].copy()
+        
+        # Crear gráfico comparativo
+        fig_comparativo = go.Figure()
+        
+        # Trace 1: Inversión Simple TNA
+        fig_comparativo.add_trace(go.Scatter(
+            x=df_grafico_simple['Mes'],
+            y=df_grafico_simple['Acumulado'],
             mode='lines+markers',
-            name='Capital Acumulado',
+            name='Inversión Simple TNA',
             line=dict(color='#F2A100', width=3),
             marker=dict(size=8)
         ))
         
-        fig.update_layout(
+        # Trace 2: Portfolio Diversificado
+        fig_comparativo.add_trace(go.Scatter(
+            x=df_grafico_portfolio['Mes'],
+            y=df_grafico_portfolio['Acumulado'],
+            mode='lines+markers',
+            name='Portfolio Diversificado',
+            line=dict(color='#6C757D', width=3),
+            marker=dict(size=8)
+        ))
+        
+        fig_comparativo.update_layout(
             xaxis_title="Mes",
             yaxis_title="Monto ($)",
             hovermode='x unified',
-            height=400,
+            height=450,
             showlegend=True,
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=1.02,
+                xanchor="center",
+                x=0.5
+            ),
             plot_bgcolor='rgba(0,0,0,0)',
             paper_bgcolor='rgba(0,0,0,0)',
-            separators=',.'  # Formato argentino: coma decimal, punto miles
+            separators=',.'
         )
         
         # Formatear eje Y con puntos de miles
-        fig.update_yaxes(tickformat="$,.0f", separatethousands=True)
+        fig_comparativo.update_yaxes(tickformat="$,.0f", separatethousands=True)
         
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig_comparativo, use_container_width=True)
 
 
 # ============================================================================

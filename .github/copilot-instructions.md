@@ -28,6 +28,11 @@
 - **COMPONENTES COMPACTOS:** Selectboxes, inputs y controles deben ser delicados y ajustados al contenido (max-width según texto que contienen)
 - **Ejemplo:** Un selectbox de fechas "Miércoles 04/03/2026" debe tener ~250px de ancho, NO ocupar todo el contenedor
 - **SELECTBOX SIMPLE:** Todos los selectbox deben ser combos simples sin campo de búsqueda/input - solo selección con mouse o teclas de dirección
+- **ESPACIADO COMPACTO:** Reducir espacios verticales entre elementos usando CSS:
+  - Entre líneas separadoras y contenido: `margin-top: -1rem`, `margin-bottom: -1rem`
+  - Entre títulos y tablas/grillas: `margin-bottom: 0.5rem` en títulos, `margin-top: -0.5rem` en tablas
+  - Entre labels e inputs: `margin-bottom: 0rem` en labels, `margin-top: -0.3rem` en inputs
+  - Mantener diseño visual compacto sin desperdiciar espacio vertical
 
 ## 📝 Convenciones de Estilo de Texto
 - **Labels y campos:** Primera letra mayúscula, resto minúscula (Ejemplo: "Premio", "Base", "Meses a proyectar")
