@@ -874,6 +874,81 @@ def cargar_historial_json():
         st.warning(f"No se pudo cargar el historial: {str(e)}")
         return []
 
+def calcular_inversiones(premio, base, tna, meses=12, gastos_iniciales=None):
+    """Calcula proyección de inversiones con capitalización mensual
+    
+    Args:
+        premio: Monto del premio total
+        base: Capital base de inversión
+        tna: Tasa Nominal Anual (ej: 0.27 para 27%)
+        meses: Número de meses a proyectar
+        gastos_iniciales: Dict con {mes: monto} de gastos extraordinarios
+    
+    Returns:
+        pandas.DataFrame con proyección mensual
+    """
+    if gastos_iniciales is None:
+        gastos_iniciales = {}
+    
+    # Nombres de meses en orden
+    meses_nombres = [
+        "ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO",
+        "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"
+    ]
+    
+    # Obtener mes actual (1-12) y calcular índice inicial
+    mes_actual = datetime.now().month  # 1=ENERO, 2=FEBRERO, ..., 12=DICIEMBRE
+    mes_inicio = mes_actual - 1  # Convertir a índice 0-based
+    
+    resultados = []
+    acumulado = base
+    total_rentabilidad = 0
+    total_neto = 0
+    total_gastos = 0
+    
+    for i in range(meses):
+        # Calcular índice del mes, comenzando desde mes_inicio
+        indice_mes = (mes_inicio + i) % 12
+        mes_nombre = meses_nombres[indice_mes]
+        
+        # Calcular rentabilidad mensual
+        rentabilidad = acumulado * (tna / 12)
+        
+        # Gastos del mes
+        gastos = gastos_iniciales.get(i + 1, 0)
+        
+        # Neto del mes
+        neto = rentabilidad - gastos
+        
+        # Actualizar acumulado
+        acumulado += neto
+        
+        # Acumular totales
+        total_rentabilidad += rentabilidad
+        total_neto += neto
+        total_gastos += gastos
+        
+        resultados.append({
+            'MES': mes_nombre,
+            'ACUMULADO': acumulado,
+            'TNA': tna,
+            'RENTABILIDAD': rentabilidad,
+            'NETO': neto,
+            'GASTOS': gastos if gastos > 0 else None
+        })
+    
+    # Agregar fila de totales
+    resultados.append({
+        'MES': 'TOTAL',
+        'ACUMULADO': acumulado,
+        'TNA': None,
+        'RENTABILIDAD': total_rentabilidad,
+        'NETO': total_neto,
+        'GASTOS': total_gastos if total_gastos > 0 else None
+    })
+    
+    return pd.DataFrame(resultados)
+
 def guardar_pozos_json(pozos):
     """Guardar pozos en archivo JSON"""
     try:
@@ -995,16 +1070,17 @@ def controlar_boleta(numeros_jugados, data, fecha_seleccionada=None):
         else:
             fecha_control = str(fecha_seleccionada)
     
-    ultimos_sorteos = data[data['fecha'] == fecha_control].tail(4)
+    # Filtrar sorteos de la fecha y ordenar por sorteo_id para mantener orden correcto
+    sorteos_fecha = data[data['fecha'] == fecha_control].sort_values('sorteo_id')
     
-    if len(ultimos_sorteos) != 4:
+    if len(sorteos_fecha) != 4:
         return None
     
-    # Nombres de las modalidades en orden
+    # Nombres de las modalidades en orden (según el orden del CSV)
     modalidades = ['Tradicional', 'Segunda', 'Revancha', 'Siempre Sale']
     
     resultados = []
-    for idx, (_, sorteo) in enumerate(ultimos_sorteos.iterrows()):
+    for idx, (_, sorteo) in enumerate(sorteos_fecha.iterrows()):
         # El DataFrame tiene una columna 'numeros' que es una lista
         numeros_sorteo = sorteo['numeros'] if isinstance(sorteo['numeros'], list) else list(sorteo['numeros'])
         
@@ -1807,13 +1883,14 @@ def main():
     # PESTAÑAS PRINCIPALES
     # ========================================================================
     
-    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+    tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
         "Predicción",
         "Control Boleta",
         "Análisis", 
         "Visualizaciones",
         "Validación Temporal",
-        "Historial"
+        "Historial",
+        "Inversiones"
     ])
     
     # ========================================================================
@@ -2616,6 +2693,252 @@ def main():
                 if HISTORIAL_FILE.exists():
                     HISTORIAL_FILE.unlink()
                 st.rerun()
+
+    # ========================================================================
+    # TAB 7: INVERSIONES
+    # ========================================================================
+    
+    with tab7:
+        st.markdown("## Proyección de Inversiones")
+        
+        # Inicializar valores en session_state
+        if 'premio_inv' not in st.session_state:
+            st.session_state.premio_inv = 7310000000.0
+        
+        # Datos iniciales en columnas más compactas
+        col_premio, col_base, col_spacer = st.columns([1.5, 1.5, 2])
+        
+        with col_premio:
+            st.markdown("**PREMIO**")
+            
+            # Formatear valor actual con puntos de miles
+            valor_formateado = f"{int(st.session_state.premio_inv):,}".replace(',', '.')
+            
+            # Input de texto con formato
+            premio_texto = st.text_input(
+                "Premio",
+                value=valor_formateado,
+                label_visibility="collapsed",
+                key="premio_input"
+            )
+            
+            # Convertir texto a número (removiendo puntos)
+            try:
+                premio = float(premio_texto.replace('.', '').replace(',', '.'))
+                st.session_state.premio_inv = premio
+                premio_formateado = f"${premio:,.0f}".replace(',', '.')
+                st.caption(premio_formateado)
+            except:
+                premio = st.session_state.premio_inv
+                st.caption("⚠️ Valor inválido")
+        
+        with col_base:
+            st.markdown("**BASE**")
+            # BASE se calcula según fórmula: PREMIO - ((PREMIO * 0.9) * 0.31)
+            base = premio - ((premio * 0.9) * 0.31)
+            base_formateado = f"{base:,.0f}".replace(',', '.')
+            st.markdown(f"<div style='padding: 8px 12px; background-color: #f0f2f6; border-radius: 4px; text-align: center; font-size: 16px;'>{base_formateado}</div>", unsafe_allow_html=True)
+            st.caption(f"${base_formateado}")
+        
+        st.markdown("---")
+        
+        # Parámetros de cálculo en columnas MUY compactas
+        col_tna, col_meses, col_spacer2 = st.columns([0.8, 1, 3.2])
+        
+        with col_tna:
+            tna_percent = st.number_input(
+                "TNA (%)",
+                value=27.0,
+                min_value=0.0,
+                max_value=100.0,
+                step=0.5,
+                format="%.2f"
+            )
+            tna = tna_percent / 100
+        
+        with col_meses:
+            meses = st.number_input(
+                "Meses a proyectar",
+                value=12,
+                min_value=1,
+                max_value=60,
+                step=1
+            )
+        
+        st.markdown("---")
+        
+        # Calcular proyección inicial con gastos por defecto (solo mes 1 y 2)
+        gastos_default = {1: 10000000.0, 2: 10000000.0}
+        df_inversiones = calcular_inversiones(
+            premio=premio,
+            base=base,
+            tna=tna,
+            meses=meses,
+            gastos_iniciales=gastos_default
+        )
+        
+        # Mostrar tabla EDITABLE
+        st.markdown("### Proyección Mensual")
+        
+        # Preparar DataFrame para edición (sin fila TOTAL)
+        df_editable = df_inversiones[df_inversiones['MES'] != 'TOTAL'].copy()
+        
+        # Reemplazar None por 0 en GASTOS para mostrar correctamente
+        df_editable['GASTOS'] = df_editable['GASTOS'].fillna(0)
+        
+        # Función formato argentino
+        def formato_argentino(valor, decimales=2, signo_pesos=True):
+            if decimales > 0:
+                texto = f"{valor:,.{decimales}f}"
+            else:
+                texto = f"{valor:,.0f}"
+            partes = texto.split('.')
+            if len(partes) == 2:
+                miles = partes[0].replace(',', '.')
+                return f"${miles},{partes[1]}" if signo_pesos else f"{miles},{partes[1]}"
+            else:
+                miles = texto.replace(',', '.')
+                return f"${miles}" if signo_pesos else miles
+        
+        # Formatear columnas de solo lectura como texto con formato argentino
+        df_display = df_editable.copy()
+        df_display['ACUMULADO_fmt'] = df_display['ACUMULADO'].apply(lambda x: formato_argentino(x, 2))
+        df_display['TNA_fmt'] = df_display['TNA'].apply(lambda x: f"{x:.2%}".replace('.', ','))
+        df_display['RENTABILIDAD_fmt'] = df_display['RENTABILIDAD'].apply(lambda x: formato_argentino(x, 2))
+        df_display['NETO_fmt'] = df_display['NETO'].apply(lambda x: formato_argentino(x, 2))
+        
+        # Crear DataFrame para mostrar con columnas formateadas
+        df_para_editar = pd.DataFrame({
+            'MES': df_display['MES'],
+            'ACUMULADO': df_display['ACUMULADO_fmt'],
+            'TNA': df_display['TNA_fmt'],
+            'RENTABILIDAD': df_display['RENTABILIDAD_fmt'],
+            'NETO': df_display['NETO_fmt'],
+            'GASTOS': df_display['GASTOS']
+        })
+        
+        # Configurar columnas editables (solo GASTOS es numérico editable)
+        column_config = {
+            "MES": st.column_config.TextColumn("MES", disabled=True, width="small"),
+            "ACUMULADO": st.column_config.TextColumn("ACUMULADO", disabled=True),
+            "TNA": st.column_config.TextColumn("TNA", disabled=True, width="small"),
+            "RENTABILIDAD": st.column_config.TextColumn("RENTABILIDAD", disabled=True),
+            "NETO": st.column_config.TextColumn("NETO", disabled=True),
+            "GASTOS": st.column_config.NumberColumn(
+                "GASTOS",
+                help="Edita el monto de gastos para este mes",
+                min_value=0,
+                max_value=1000000000,
+                step=1000000,
+                format="$%.0f"
+            )
+        }
+        
+        # Calcular altura según cantidad de meses
+        num_filas = len(df_para_editar)
+        
+        # Mostrar tabla editable con altura dinámica
+        if num_filas <= 12:
+            # Para <=12 meses, calcular altura exacta para mostrar todo sin scroll
+            altura_fila = 35
+            altura_header = 38
+            altura_tabla = (num_filas * altura_fila) + altura_header + 10
+            df_editado = st.data_editor(
+                df_para_editar,
+                column_config=column_config,
+                use_container_width=True,
+                hide_index=True,
+                num_rows="fixed",
+                height=altura_tabla,
+                key="tabla_inversiones"
+            )
+        else:
+            # Para más de 12 meses, limitar a 12 filas visibles con scroll
+            altura_fija = (12 * 35) + 38 + 10
+            df_editado = st.data_editor(
+                df_para_editar,
+                column_config=column_config,
+                use_container_width=True,
+                hide_index=True,
+                num_rows="fixed",
+                height=altura_fija,
+                key="tabla_inversiones"
+            )
+        
+        # Extraer gastos editados y recalcular
+        gastos_dict_editado = {}
+        for idx, row in df_editado.iterrows():
+            if row['GASTOS'] > 0:
+                gastos_dict_editado[idx + 1] = row['GASTOS']  # idx + 1 porque mes empieza en 1
+        
+        # Recalcular con gastos editados
+        df_inversiones_final = calcular_inversiones(
+            premio=premio,
+            base=base,
+            tna=tna,
+            meses=meses,
+            gastos_iniciales=gastos_dict_editado
+        )
+        
+        # Mostrar fila TOTAL
+        fila_total = df_inversiones_final[df_inversiones_final['MES'] == 'TOTAL'].iloc[0]
+        
+        # Preparar DataFrame de TOTAL para mostrar
+        df_total = pd.DataFrame([{
+            'MES': 'TOTAL',
+            'ACUMULADO': formato_argentino(fila_total['ACUMULADO'], 2),
+            'TNA': '',
+            'RENTABILIDAD': formato_argentino(fila_total['RENTABILIDAD'], 2),
+            'NETO': formato_argentino(fila_total['NETO'], 2),
+            'GASTOS': formato_argentino(fila_total['GASTOS'], 0) if pd.notna(fila_total['GASTOS']) else ''
+        }])
+        
+        st.dataframe(
+            df_total,
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "MES": st.column_config.TextColumn("MES", width="small"),
+                "ACUMULADO": st.column_config.TextColumn("ACUMULADO"),
+                "TNA": st.column_config.TextColumn("TNA", width="small"),
+                "RENTABILIDAD": st.column_config.TextColumn("RENTABILIDAD"),
+                "NETO": st.column_config.TextColumn("NETO"),
+                "GASTOS": st.column_config.TextColumn("GASTOS")
+            }
+        )
+        
+        # Gráfico de evolución
+        st.markdown("### Evolución del Capital")
+        
+        # Preparar datos para gráfico (excluir TOTAL)
+        df_grafico = df_inversiones_final[df_inversiones_final['MES'] != 'TOTAL'].copy()
+        
+        fig = go.Figure()
+        
+        fig.add_trace(go.Scatter(
+            x=df_grafico['MES'],
+            y=df_grafico['ACUMULADO'],
+            mode='lines+markers',
+            name='Capital Acumulado',
+            line=dict(color='#F2A100', width=3),
+            marker=dict(size=8)
+        ))
+        
+        fig.update_layout(
+            xaxis_title="Mes",
+            yaxis_title="Monto ($)",
+            hovermode='x unified',
+            height=400,
+            showlegend=True,
+            plot_bgcolor='rgba(0,0,0,0)',
+            paper_bgcolor='rgba(0,0,0,0)',
+            separators=',.'  # Formato argentino: coma decimal, punto miles
+        )
+        
+        # Formatear eje Y con puntos de miles
+        fig.update_yaxes(tickformat="$,.0f", separatethousands=True)
+        
+        st.plotly_chart(fig, use_container_width=True)
 
 
 # ============================================================================

@@ -50,14 +50,16 @@ class DataLoader:
             processed_data = []
             for idx, row in df.iterrows():
                 sorteo = {
-                    'sorteo_id': idx + 1,
+                    'sorteo_id': int(row.get('sorteo_id', idx + 1)),  # Usar sorteo_id del CSV si existe
                     'fecha': pd.to_datetime(row[date_column]),
                     'numeros': sorted([int(row[col]) for col in numbers_columns])
                 }
                 processed_data.append(sorteo)
             
             self.data = pd.DataFrame(processed_data)
-            self.data = self.data.sort_values('fecha').reset_index(drop=True)
+            # Ordenar por sorteo_id para mantener el orden original del CSV
+            # Esto preserva el orden: Tradicional, Segunda, Revancha, Siempre Sale
+            self.data = self.data.sort_values('sorteo_id').reset_index(drop=True)
             
             print(f"✓ Cargados {len(self.data)} sorteos desde CSV")
             print(f"  Rango de fechas: {self.data['fecha'].min()} a {self.data['fecha'].max()}")
