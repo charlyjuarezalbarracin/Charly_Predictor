@@ -29,6 +29,14 @@
 - **Ejemplo:** Un selectbox de fechas "Miércoles 04/03/2026" debe tener ~250px de ancho, NO ocupar todo el contenedor
 - **SELECTBOX SIMPLE:** Todos los selectbox deben ser combos simples sin campo de búsqueda/input - solo selección con mouse o teclas de dirección
 
+## 📝 Convenciones de Estilo de Texto
+- **Labels y campos:** Primera letra mayúscula, resto minúscula (Ejemplo: "Premio", "Base", "Meses a proyectar")
+- **Columnas de tablas:** Primera letra mayúscula (Ejemplo: "Mes", "Acumulado", "Rentabilidad", "Neto", "Gastos")
+- **Uniformidad:** TODOS los labels, campos y columnas deben seguir este patrón consistentemente
+- **Excepción:** Siglas/acrónimos se mantienen en mayúsculas (Ejemplo: "TNA")
+- **Títulos principales:** Pueden usar formato markdown (##, ###) pero NO todo en mayúsculas
+- **NO usar:** Texto completamente en MAYÚSCULAS excepto para acrónimos
+
 ## 🎯 FILOSOFÍA DEL PROYECTO - SISTEMA PROFESIONAL DE PRODUCCIÓN
 
 **MISIÓN:**

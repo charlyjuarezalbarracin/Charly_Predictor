@@ -832,6 +832,7 @@ st.markdown("""
 
 HISTORIAL_FILE = Path('data/historial_predicciones.json')
 POZOS_FILE = Path('data/pozos_actuales.json')
+GASTOS_FILE = Path('data/gastos_inversiones.json')
 
 def convertir_a_serializable(obj):
     """Convertir tipos numpy a tipos nativos de Python para JSON"""
@@ -911,7 +912,7 @@ def calcular_inversiones(premio, base, tna, meses=12, gastos_iniciales=None):
         indice_mes = (mes_inicio + i) % 12
         mes_nombre = meses_nombres[indice_mes]
         
-        # Calcular rentabilidad mensual
+        # Calcular rentabilidad mensual sobre el acumulado ACTUAL
         rentabilidad = acumulado * (tna / 12)
         
         # Gastos del mes
@@ -920,31 +921,32 @@ def calcular_inversiones(premio, base, tna, meses=12, gastos_iniciales=None):
         # Neto del mes
         neto = rentabilidad - gastos
         
-        # Actualizar acumulado
+        # Guardar resultado del mes con acumulado ACTUAL (antes de actualizarlo)
+        resultados.append({
+            'Mes': mes_nombre,
+            'Acumulado': acumulado,
+            'TNA': tna,
+            'Rentabilidad': rentabilidad,
+            'Neto': neto,
+            'Gastos': gastos if gastos > 0 else None
+        })
+        
+        # Actualizar acumulado para el siguiente mes
         acumulado += neto
         
         # Acumular totales
         total_rentabilidad += rentabilidad
         total_neto += neto
         total_gastos += gastos
-        
-        resultados.append({
-            'MES': mes_nombre,
-            'ACUMULADO': acumulado,
-            'TNA': tna,
-            'RENTABILIDAD': rentabilidad,
-            'NETO': neto,
-            'GASTOS': gastos if gastos > 0 else None
-        })
     
     # Agregar fila de totales
     resultados.append({
-        'MES': 'TOTAL',
-        'ACUMULADO': acumulado,
+        'Mes': 'Total',
+        'Acumulado': acumulado,
         'TNA': None,
-        'RENTABILIDAD': total_rentabilidad,
-        'NETO': total_neto,
-        'GASTOS': total_gastos if total_gastos > 0 else None
+        'Rentabilidad': total_rentabilidad,
+        'Neto': total_neto,
+        'Gastos': total_gastos if total_gastos > 0 else None
     })
     
     return pd.DataFrame(resultados)
@@ -967,6 +969,30 @@ def cargar_pozos_json():
         return None
     except Exception as e:
         print(f"No se pudo cargar pozos: {str(e)}")
+        return None
+
+def guardar_gastos_json(gastos):
+    """Guardar gastos de inversiones en archivo JSON"""
+    try:
+        GASTOS_FILE.parent.mkdir(parents=True, exist_ok=True)
+        # Convertir keys de int a string para JSON
+        gastos_serializables = {str(k): v for k, v in gastos.items()}
+        with open(GASTOS_FILE, 'w', encoding='utf-8') as f:
+            json.dump(gastos_serializables, f, indent=2, ensure_ascii=False)
+    except Exception as e:
+        print(f"No se pudo guardar gastos: {str(e)}")
+
+def cargar_gastos_json():
+    """Cargar gastos de inversiones desde archivo JSON"""
+    try:
+        if GASTOS_FILE.exists():
+            with open(GASTOS_FILE, 'r', encoding='utf-8') as f:
+                gastos_str = json.load(f)
+                # Convertir keys de string a int
+                return {int(k): v for k, v in gastos_str.items()}
+        return None
+    except Exception as e:
+        print(f"No se pudo cargar gastos: {str(e)}")
         return None
 
 def obtener_ultima_fecha_csv():
@@ -1220,37 +1246,37 @@ def mostrar_analisis_regresion_equilibrio(regression_analyzer):
     with cols[0]:
         if deseq['paridad']:
             desbalance_pct = abs(metricas['desbalance_pares']) * 100
-            st.markdown(f"**Pares/Impares**")
+            st.markdown("Pares/Impares")
             st.markdown(f"Desbalance: {desbalance_pct:.1f}%")
             if corr['paridad']:
                 st.markdown(f"→ {corr['paridad'].replace('_', ' ').title()}")
         else:
-            st.markdown("**Pares/Impares**")
+            st.markdown("Pares/Impares")
             st.markdown("✓ En equilibrio")
     
     # Suma
     with cols[1]:
         if deseq['suma']:
             z_score = metricas['z_score_suma']
-            st.markdown(f"**Suma Total**")
+            st.markdown("Suma Total")
             st.markdown(f"Z-Score: {z_score:+.2f}σ")
             if corr['suma']:
                 st.markdown(f"→ {corr['suma'].replace('_', ' ').title()}")
                 if metricas['suma_objetivo']:
                     st.markdown(f"Objetivo: ~{metricas['suma_objetivo']:.0f}")
         else:
-            st.markdown("**Suma Total**")
+            st.markdown("Suma Total")
             st.markdown("✓ En equilibrio")
     
     # Rangos
     with cols[2]:
         if deseq['rangos']:
-            st.markdown(f"**Rangos**")
+            st.markdown("Rangos")
             for rango, accion in corr['rangos'].items():
                 rango_nombre = rango.replace('rango_', '').title()
                 st.markdown(f"{rango_nombre}: {accion}")
         else:
-            st.markdown("**Rangos**")
+            st.markdown("Rangos")
             st.markdown("✓ En equilibrio")
 
 
@@ -2674,12 +2700,12 @@ def main():
                     col1, col2 = st.columns([2, 1])
                     
                     with col1:
-                        st.markdown("**Números:**")
+                        st.markdown("Números:")
                         numeros_texto = ', '.join([f"{n:02d}" for n in entry['prediccion']])
                         st.markdown(f"### {numeros_texto}")
                     
                     with col2:
-                        st.markdown("**Estadísticas:**")
+                        st.markdown("Estadísticas:")
                         if 'suma_total' in entry['scores']:
                             st.write(f"Suma: {entry['scores']['suma_total']}")
                             st.write(f"Score: {entry['scores']['score_promedio']:.3f}")
@@ -2701,15 +2727,17 @@ def main():
     with tab7:
         st.markdown("## Proyección de Inversiones")
         
+        st.markdown("---")
+
         # Inicializar valores en session_state
         if 'premio_inv' not in st.session_state:
             st.session_state.premio_inv = 7310000000.0
         
         # Datos iniciales en columnas más compactas
-        col_premio, col_base, col_spacer = st.columns([1.5, 1.5, 2])
+        col_premio, col_base, col_spacer = st.columns([0.5, 0.5, 2])
         
         with col_premio:
-            st.markdown("**PREMIO**")
+            st.markdown("Premio")
             
             # Formatear valor actual con puntos de miles
             valor_formateado = f"{int(st.session_state.premio_inv):,}".replace(',', '.')
@@ -2733,7 +2761,7 @@ def main():
                 st.caption("⚠️ Valor inválido")
         
         with col_base:
-            st.markdown("**BASE**")
+            st.markdown("Base")
             # BASE se calcula según fórmula: PREMIO - ((PREMIO * 0.9) * 0.31)
             base = premio - ((premio * 0.9) * 0.31)
             base_formateado = f"{base:,.0f}".replace(',', '.')
@@ -2743,7 +2771,7 @@ def main():
         st.markdown("---")
         
         # Parámetros de cálculo en columnas MUY compactas
-        col_tna, col_meses, col_spacer2 = st.columns([0.8, 1, 3.2])
+        col_tna, col_meses, col_spacer2 = st.columns([0.8, 0.8, 3.2])
         
         with col_tna:
             tna_percent = st.number_input(
@@ -2767,24 +2795,41 @@ def main():
         
         st.markdown("---")
         
-        # Calcular proyección inicial con gastos por defecto (solo mes 1 y 2)
-        gastos_default = {1: 10000000.0, 2: 10000000.0}
+        # Inicializar gastos en session_state si no existe
+        if 'gastos_inversiones' not in st.session_state:
+            # Intentar cargar desde JSON
+            gastos_guardados = cargar_gastos_json()
+            if gastos_guardados:
+                st.session_state.gastos_inversiones = gastos_guardados
+            else:
+                # Valores por defecto
+                st.session_state.gastos_inversiones = {1: 15000000.0}
+        
+        # Limpiar gastos de meses que exceden el nuevo límite
+        if st.session_state.gastos_inversiones:
+            gastos_validos = {mes: monto for mes, monto in st.session_state.gastos_inversiones.items() if mes <= meses}
+            if len(gastos_validos) != len(st.session_state.gastos_inversiones):
+                st.session_state.gastos_inversiones = gastos_validos
+                # Guardar cambio en JSON
+                guardar_gastos_json(st.session_state.gastos_inversiones)
+        
+        # Calcular proyección con gastos guardados
         df_inversiones = calcular_inversiones(
             premio=premio,
             base=base,
             tna=tna,
             meses=meses,
-            gastos_iniciales=gastos_default
+            gastos_iniciales=st.session_state.gastos_inversiones
         )
         
         # Mostrar tabla EDITABLE
         st.markdown("### Proyección Mensual")
         
-        # Preparar DataFrame para edición (sin fila TOTAL)
-        df_editable = df_inversiones[df_inversiones['MES'] != 'TOTAL'].copy()
+        # Preparar DataFrame para edición (sin fila Total)
+        df_editable = df_inversiones[df_inversiones['Mes'] != 'Total'].copy()
         
-        # Reemplazar None por 0 en GASTOS para mostrar correctamente
-        df_editable['GASTOS'] = df_editable['GASTOS'].fillna(0)
+        # Reemplazar None por 0 en Gastos para mostrar correctamente
+        df_editable['Gastos'] = df_editable['Gastos'].fillna(0)
         
         # Función formato argentino
         def formato_argentino(valor, decimales=2, signo_pesos=True):
@@ -2802,35 +2847,33 @@ def main():
         
         # Formatear columnas de solo lectura como texto con formato argentino
         df_display = df_editable.copy()
-        df_display['ACUMULADO_fmt'] = df_display['ACUMULADO'].apply(lambda x: formato_argentino(x, 2))
+        df_display['Acumulado_fmt'] = df_display['Acumulado'].apply(lambda x: formato_argentino(x, 2))
         df_display['TNA_fmt'] = df_display['TNA'].apply(lambda x: f"{x:.2%}".replace('.', ','))
-        df_display['RENTABILIDAD_fmt'] = df_display['RENTABILIDAD'].apply(lambda x: formato_argentino(x, 2))
-        df_display['NETO_fmt'] = df_display['NETO'].apply(lambda x: formato_argentino(x, 2))
+        df_display['Rentabilidad_fmt'] = df_display['Rentabilidad'].apply(lambda x: formato_argentino(x, 2))
+        df_display['Neto_fmt'] = df_display['Neto'].apply(lambda x: formato_argentino(x, 2))
+        df_display['Gastos_fmt'] = df_display['Gastos'].apply(lambda x: formato_argentino(x, 0, signo_pesos=False) if pd.notna(x) and x > 0 else '')
         
         # Crear DataFrame para mostrar con columnas formateadas
         df_para_editar = pd.DataFrame({
-            'MES': df_display['MES'],
-            'ACUMULADO': df_display['ACUMULADO_fmt'],
+            'Mes': df_display['Mes'],
+            'Acumulado': df_display['Acumulado_fmt'],
             'TNA': df_display['TNA_fmt'],
-            'RENTABILIDAD': df_display['RENTABILIDAD_fmt'],
-            'NETO': df_display['NETO_fmt'],
-            'GASTOS': df_display['GASTOS']
+            'Rentabilidad': df_display['Rentabilidad_fmt'],
+            'Neto': df_display['Neto_fmt'],
+            'Gastos': df_display['Gastos_fmt']
         })
         
-        # Configurar columnas editables (solo GASTOS es numérico editable)
+        # Configurar columnas editables (solo Gastos es editable)
         column_config = {
-            "MES": st.column_config.TextColumn("MES", disabled=True, width="small"),
-            "ACUMULADO": st.column_config.TextColumn("ACUMULADO", disabled=True),
+            "Mes": st.column_config.TextColumn("Mes", disabled=True, width="small"),
+            "Acumulado": st.column_config.TextColumn("Acumulado", disabled=True),
             "TNA": st.column_config.TextColumn("TNA", disabled=True, width="small"),
-            "RENTABILIDAD": st.column_config.TextColumn("RENTABILIDAD", disabled=True),
-            "NETO": st.column_config.TextColumn("NETO", disabled=True),
-            "GASTOS": st.column_config.NumberColumn(
-                "GASTOS",
-                help="Edita el monto de gastos para este mes",
-                min_value=0,
-                max_value=1000000000,
-                step=1000000,
-                format="$%.0f"
+            "Rentabilidad": st.column_config.TextColumn("Rentabilidad", disabled=True),
+            "Neto": st.column_config.TextColumn("Neto", disabled=True),
+            "Gastos": st.column_config.TextColumn(
+                "Gastos",
+                help="Edita el monto de gastos para este mes (formato: 10.000.000)",
+                width="medium"
             )
         }
         
@@ -2865,32 +2908,67 @@ def main():
                 key="tabla_inversiones"
             )
         
-        # Extraer gastos editados y recalcular
-        gastos_dict_editado = {}
-        for idx, row in df_editado.iterrows():
-            if row['GASTOS'] > 0:
-                gastos_dict_editado[idx + 1] = row['GASTOS']  # idx + 1 porque mes empieza en 1
+        # Botón para limpiar gastos
+        col_btn1, col_btn2, col_spacer_btn = st.columns([1, 1, 3])
+        with col_btn1:
+            if st.button("Limpiar gastos", type="secondary"):
+                st.session_state.gastos_inversiones = {}
+                guardar_gastos_json(st.session_state.gastos_inversiones)
+                st.rerun()
         
-        # Recalcular con gastos editados
+        # Extraer gastos editados y actualizar session_state
+        gastos_dict_editado = {}
+        cambios_detectados = False
+        
+        for idx, row in df_editado.iterrows():
+            gastos_str = str(row['Gastos']).strip()
+            mes_num = idx + 1  # idx + 1 porque mes empieza en 1
+            
+            if gastos_str and gastos_str != '':
+                try:
+                    # Parsear formato argentino: quitar puntos y convertir comas a punto
+                    gastos_num = float(gastos_str.replace('.', '').replace(',', '.'))
+                    if gastos_num > 0:
+                        gastos_dict_editado[mes_num] = gastos_num
+                        # Detectar cambios (nuevo o modificado)
+                        if mes_num not in st.session_state.gastos_inversiones or \
+                           st.session_state.gastos_inversiones[mes_num] != gastos_num:
+                            cambios_detectados = True
+                except:
+                    pass  # Ignorar valores inválidos
+        
+        # Detectar gastos eliminados (meses que tenían gastos y ahora no)
+        for mes_num in st.session_state.gastos_inversiones:
+            if mes_num not in gastos_dict_editado:
+                cambios_detectados = True
+                break
+        
+        # Si hay cambios, actualizar session_state, guardar en JSON y rerun para reformatear
+        if cambios_detectados:
+            st.session_state.gastos_inversiones = gastos_dict_editado
+            guardar_gastos_json(st.session_state.gastos_inversiones)
+            st.rerun()
+        
+        # Recalcular con gastos actualizados
         df_inversiones_final = calcular_inversiones(
             premio=premio,
             base=base,
             tna=tna,
             meses=meses,
-            gastos_iniciales=gastos_dict_editado
+            gastos_iniciales=st.session_state.gastos_inversiones
         )
         
-        # Mostrar fila TOTAL
-        fila_total = df_inversiones_final[df_inversiones_final['MES'] == 'TOTAL'].iloc[0]
+        # Mostrar fila Total
+        fila_total = df_inversiones_final[df_inversiones_final['Mes'] == 'Total'].iloc[0]
         
-        # Preparar DataFrame de TOTAL para mostrar
+        # Preparar DataFrame de Total para mostrar
         df_total = pd.DataFrame([{
-            'MES': 'TOTAL',
-            'ACUMULADO': formato_argentino(fila_total['ACUMULADO'], 2),
+            'Mes': 'Total',
+            'Acumulado': formato_argentino(fila_total['Acumulado'], 2),
             'TNA': '',
-            'RENTABILIDAD': formato_argentino(fila_total['RENTABILIDAD'], 2),
-            'NETO': formato_argentino(fila_total['NETO'], 2),
-            'GASTOS': formato_argentino(fila_total['GASTOS'], 0) if pd.notna(fila_total['GASTOS']) else ''
+            'Rentabilidad': formato_argentino(fila_total['Rentabilidad'], 2),
+            'Neto': formato_argentino(fila_total['Neto'], 2),
+            'Gastos': formato_argentino(fila_total['Gastos'], 0) if pd.notna(fila_total['Gastos']) else ''
         }])
         
         st.dataframe(
@@ -2898,26 +2976,26 @@ def main():
             use_container_width=True,
             hide_index=True,
             column_config={
-                "MES": st.column_config.TextColumn("MES", width="small"),
-                "ACUMULADO": st.column_config.TextColumn("ACUMULADO"),
+                "Mes": st.column_config.TextColumn("Mes", width="small"),
+                "Acumulado": st.column_config.TextColumn("Acumulado"),
                 "TNA": st.column_config.TextColumn("TNA", width="small"),
-                "RENTABILIDAD": st.column_config.TextColumn("RENTABILIDAD"),
-                "NETO": st.column_config.TextColumn("NETO"),
-                "GASTOS": st.column_config.TextColumn("GASTOS")
+                "Rentabilidad": st.column_config.TextColumn("Rentabilidad"),
+                "Neto": st.column_config.TextColumn("Neto"),
+                "Gastos": st.column_config.TextColumn("Gastos")
             }
         )
         
         # Gráfico de evolución
         st.markdown("### Evolución del Capital")
         
-        # Preparar datos para gráfico (excluir TOTAL)
-        df_grafico = df_inversiones_final[df_inversiones_final['MES'] != 'TOTAL'].copy()
+        # Preparar datos para gráfico (excluir Total)
+        df_grafico = df_inversiones_final[df_inversiones_final['Mes'] != 'Total'].copy()
         
         fig = go.Figure()
         
         fig.add_trace(go.Scatter(
-            x=df_grafico['MES'],
-            y=df_grafico['ACUMULADO'],
+            x=df_grafico['Mes'],
+            y=df_grafico['Acumulado'],
             mode='lines+markers',
             name='Capital Acumulado',
             line=dict(color='#F2A100', width=3),
