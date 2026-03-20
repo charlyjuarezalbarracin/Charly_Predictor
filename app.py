@@ -876,7 +876,7 @@ def cargar_historial_json():
         return []
 
 def calcular_inversion_portfolio(capital_inicial, pct_pf, tasa_pf, pct_fci_cer, tasa_fci_cer, 
-                                  pct_fci_usd, tasa_fci_usd, inflacion_mensual, retiro_mensual, 
+                                  pct_fci_usd, tasa_fci_usd, inflacion_mensual, 
                                   meses=12, gastos_iniciales=None):
     """Calcula proyección de inversiones con portfolio diversificado
     
@@ -889,9 +889,8 @@ def calcular_inversion_portfolio(capital_inicial, pct_pf, tasa_pf, pct_fci_cer, 
         pct_fci_usd: Porcentaje en FCI USD (0-100)
         tasa_fci_usd: Tasa mensual FCI USD (%)
         inflacion_mensual: Inflación mensual (%)
-        retiro_mensual: Monto fijo de retiro mensual
         meses: Número de meses a proyectar
-        gastos_iniciales: Dict con {mes: monto} de gastos extraordinarios
+        gastos_iniciales: Dict con {mes: monto} de gastos editables desde grilla
     
     Returns:
         pandas.DataFrame con proyección mensual
@@ -917,8 +916,7 @@ def calcular_inversion_portfolio(capital_inicial, pct_pf, tasa_pf, pct_fci_cer, 
     resultados = []
     total_rentabilidad = 0
     total_neto = 0
-    total_gastos = retiro_mensual * meses
-    total_gastos_extra = sum(gastos_iniciales.values()) if gastos_iniciales else 0
+    total_gastos = sum(gastos_iniciales.values()) if gastos_iniciales else 0
     
     for i in range(meses):
         indice_mes = (mes_inicio + i) % 12
@@ -934,9 +932,8 @@ def calcular_inversion_portfolio(capital_inicial, pct_pf, tasa_pf, pct_fci_cer, 
         
         rentabilidad_total = rent_pf + rent_cer + rent_usd
         
-        # Gastos: retiro mensual + gastos extraordinarios
-        gastos_extra = gastos_iniciales.get(i + 1, 0)
-        gastos_mes = retiro_mensual + gastos_extra
+        # Gastos del mes (solo desde grilla editable)
+        gastos_mes = gastos_iniciales.get(i + 1, 0)
         
         # Neto del mes
         neto = rentabilidad_total - gastos_mes
@@ -948,8 +945,7 @@ def calcular_inversion_portfolio(capital_inicial, pct_pf, tasa_pf, pct_fci_cer, 
             'TNA': None,  # No aplica en portfolio
             'Rentabilidad': rentabilidad_total,
             'Neto': neto,
-            'Gastos': gastos_mes if gastos_mes > 0 else None,
-            'Gastos_extra': gastos_extra if gastos_extra > 0 else None  # Solo gastos extraordinarios
+            'Gastos': gastos_mes if gastos_mes > 0 else None
         })
         
         # Actualizar capitales para siguiente mes
@@ -972,8 +968,7 @@ def calcular_inversion_portfolio(capital_inicial, pct_pf, tasa_pf, pct_fci_cer, 
         'TNA': None,
         'Rentabilidad': total_rentabilidad,
         'Neto': total_neto,
-        'Gastos': (total_gastos + total_gastos_extra) if (total_gastos + total_gastos_extra) > 0 else None,
-        'Gastos_extra': total_gastos_extra if total_gastos_extra > 0 else None
+        'Gastos': total_gastos if total_gastos > 0 else None
     })
     
     return pd.DataFrame(resultados)
@@ -3006,15 +3001,15 @@ def main():
         
         # Configurar columnas editables (solo Gastos es editable)
         column_config = {
-            "Mes": st.column_config.TextColumn("Mes", disabled=True, width="small"),
-            "Acumulado": st.column_config.TextColumn("Acumulado", disabled=True),
-            "TNA": st.column_config.TextColumn("TNA", disabled=True, width="small"),
-            "Rentabilidad": st.column_config.TextColumn("Rentabilidad", disabled=True),
-            "Neto": st.column_config.TextColumn("Neto", disabled=True),
+            "Mes": st.column_config.TextColumn("Mes", disabled=True, width=120),
+            "Acumulado": st.column_config.TextColumn("Acumulado", disabled=True, width=120),
+            "TNA": st.column_config.TextColumn("TNA", disabled=True, width=120),
+            "Rentabilidad": st.column_config.TextColumn("Rentabilidad", disabled=True, width=120),
+            "Neto": st.column_config.TextColumn("Neto", disabled=True, width=120),
             "Gastos": st.column_config.TextColumn(
                 "Gastos",
                 help="Edita el monto de gastos para este mes (formato: 10.000.000)",
-                width="medium"
+                width=120
             )
         }
         
@@ -3048,14 +3043,6 @@ def main():
                 height=altura_fija,
                 key="tabla_inversiones"
             )
-        
-        # Botón para limpiar gastos
-        col_btn1, col_btn2, col_spacer_btn = st.columns([1, 1, 3])
-        with col_btn1:
-            if st.button("Limpiar gastos", type="secondary"):
-                st.session_state.gastos_inversiones = {}
-                guardar_gastos_json(st.session_state.gastos_inversiones)
-                st.rerun()
         
         # Extraer gastos editados y actualizar session_state
         gastos_dict_editado = {}
@@ -3117,14 +3104,22 @@ def main():
             use_container_width=True,
             hide_index=True,
             column_config={
-                "Mes": st.column_config.TextColumn("Mes", width="small"),
-                "Acumulado": st.column_config.TextColumn("Acumulado"),
-                "TNA": st.column_config.TextColumn("TNA", width="small"),
-                "Rentabilidad": st.column_config.TextColumn("Rentabilidad"),
-                "Neto": st.column_config.TextColumn("Neto"),
-                "Gastos": st.column_config.TextColumn("Gastos")
+                "Mes": st.column_config.TextColumn("Mes", width=120),
+                "Acumulado": st.column_config.TextColumn("Acumulado", width=120),
+                "TNA": st.column_config.TextColumn("TNA", width=120),
+                "Rentabilidad": st.column_config.TextColumn("Rentabilidad", width=120),
+                "Neto": st.column_config.TextColumn("Neto", width=120),
+                "Gastos": st.column_config.TextColumn("Gastos", width=120)
             }
         )
+        
+        # Botón para limpiar gastos
+        col_btn1, col_btn2, col_spacer_btn = st.columns([1, 1, 3])
+        with col_btn1:
+            if st.button("Limpiar gastos", type="secondary", key="limpiar_gastos_simple"):
+                st.session_state.gastos_inversiones = {}
+                guardar_gastos_json(st.session_state.gastos_inversiones)
+                st.rerun()
         
         # ====================================================================
         # PROYECCIÓN CON PORTFOLIO DIVERSIFICADO
@@ -3137,13 +3132,11 @@ def main():
         # Inicializar valores en session_state
         if 'premio_portfolio' not in st.session_state:
             st.session_state.premio_portfolio = 7310000000.0
-        if 'retiro_mensual' not in st.session_state:
-            st.session_state.retiro_mensual = 20000000.0
         if 'gastos_portfolio' not in st.session_state:
             st.session_state.gastos_portfolio = {}
         
         # Inputs en una fila compacta
-        col1, col2, col3, col4, col5, col_spacer = st.columns([0.7, 0.7, 0.7, 0.7, 0.4, 1.1])
+        col1, col2, col3, col4, col_spacer = st.columns([0.7, 0.7, 0.7, 0.4, 2.5])
         
         with col1:
             st.markdown('<p style="margin-bottom: 0rem;">Premio</p>', unsafe_allow_html=True)
@@ -3174,21 +3167,6 @@ def main():
             st.markdown(f"<div style='padding: 8px 12px; background-color: #f0f2f6; border-radius: 4px; text-align: center; font-size: 16px;'>{base_portfolio_formateado}</div>", unsafe_allow_html=True)
         
         with col3:
-            st.markdown('<p style="margin-bottom: 0rem;">Retiro mensual</p>', unsafe_allow_html=True)
-            valor_retiro_formateado = f"{int(st.session_state.retiro_mensual):,}".replace(',', '.')
-            retiro_texto = st.text_input(
-                "Retiro mensual",
-                value=valor_retiro_formateado,
-                label_visibility="collapsed",
-                key="retiro_mensual_input"
-            )
-            try:
-                retiro_mensual = float(retiro_texto.replace('.', '').replace(',', '.'))
-                st.session_state.retiro_mensual = retiro_mensual
-            except:
-                retiro_mensual = st.session_state.retiro_mensual
-        
-        with col4:
             inflacion = st.number_input(
                 "Inflación mensual (%)",
                 value=3.0,
@@ -3198,9 +3176,9 @@ def main():
                 format="%.2f"
             )
         
-        with col5:
+        with col4:
             meses_portfolio = st.number_input(
-                "Meses a proyectar",
+                "Meses",
                 value=12,
                 min_value=1,
                 max_value=60,
@@ -3214,30 +3192,36 @@ def main():
         col_pf1, col_pf2, col_cer1, col_cer2, col_usd1, col_usd2, col_spacer2 = st.columns([0.35, 0.35, 0.35, 0.35, 0.35, 0.35, 2.25])
         
         with col_pf1:
-            st.markdown('<p style="font-weight: 500; margin-bottom: 0.3rem;">Plazo fijo</p>', unsafe_allow_html=True)
+            st.markdown('<p style="margin-bottom: 0.3rem;">PF %</p>', unsafe_allow_html=True)
             pct_pf = st.number_input("Porcentaje (%)", value=30.0, min_value=0.0, max_value=100.0, step=5.0, format="%.1f", key="pct_pf", label_visibility="collapsed")
         with col_pf2:
-            st.markdown('<p style="font-weight: 500; margin-bottom: 0.3rem; color: transparent;">.</p>', unsafe_allow_html=True)
+            st.markdown('<p style="margin-bottom: 0.3rem;">PF Tasa</p>', unsafe_allow_html=True)
             tasa_pf = st.number_input("Tasa mensual (%)", value=7.0, min_value=0.0, max_value=50.0, step=0.5, format="%.2f", key="tasa_pf", label_visibility="collapsed")
         
         with col_cer1:
-            st.markdown('<p style="font-weight: 500; margin-bottom: 0.3rem;">FCI CER</p>', unsafe_allow_html=True)
+            st.markdown('<p style="margin-bottom: 0.3rem;">FCI CER %</p>', unsafe_allow_html=True)
             pct_cer = st.number_input("Porcentaje (%)", value=30.0, min_value=0.0, max_value=100.0, step=5.0, format="%.1f", key="pct_cer", label_visibility="collapsed")
         with col_cer2:
-            st.markdown('<p style="font-weight: 500; margin-bottom: 0.3rem; color: transparent;">.</p>', unsafe_allow_html=True)
+            st.markdown('<p style="margin-bottom: 0.3rem;">FCI CER Tasa</p>', unsafe_allow_html=True)
             tasa_cer = st.number_input("Tasa mensual (%)", value=3.5, min_value=0.0, max_value=50.0, step=0.5, format="%.2f", key="tasa_cer", label_visibility="collapsed")
         
         with col_usd1:
-            st.markdown('<p style="font-weight: 500; margin-bottom: 0.3rem;">FCI USD</p>', unsafe_allow_html=True)
+            st.markdown('<p style="margin-bottom: 0.3rem;">FCI USD %</p>', unsafe_allow_html=True)
             pct_usd = st.number_input("Porcentaje (%)", value=40.0, min_value=0.0, max_value=100.0, step=5.0, format="%.1f", key="pct_usd", label_visibility="collapsed")
         with col_usd2:
-            st.markdown('<p style="font-weight: 500; margin-bottom: 0.3rem; color: transparent;">.</p>', unsafe_allow_html=True)
+            st.markdown('<p style="margin-bottom: 0.3rem;">FCI USD Tasa</p>', unsafe_allow_html=True)
             tasa_usd = st.number_input("Tasa mensual (%)", value=0.5, min_value=0.0, max_value=50.0, step=0.5, format="%.2f", key="tasa_usd", label_visibility="collapsed")
         
         # Validar que la suma de porcentajes sea 100%
         suma_pct = pct_pf + pct_cer + pct_usd
         if abs(suma_pct - 100.0) > 0.1:
             st.warning(f"⚠️ La suma de porcentajes debe ser 100% (actual: {suma_pct:.1f}%)")
+        
+        # Limpiar gastos de meses que exceden el nuevo límite
+        if st.session_state.gastos_portfolio:
+            gastos_validos = {mes: monto for mes, monto in st.session_state.gastos_portfolio.items() if mes <= meses_portfolio}
+            if len(gastos_validos) != len(st.session_state.gastos_portfolio):
+                st.session_state.gastos_portfolio = gastos_validos
         
         # Calcular proyección de portfolio con gastos guardados
         df_portfolio = calcular_inversion_portfolio(
@@ -3249,7 +3233,6 @@ def main():
             pct_fci_usd=pct_usd,
             tasa_fci_usd=tasa_usd,
             inflacion_mensual=inflacion,
-            retiro_mensual=retiro_mensual,
             meses=meses_portfolio,
             gastos_iniciales=st.session_state.gastos_portfolio
         )
@@ -3266,8 +3249,6 @@ def main():
         df_display_portfolio['Rentabilidad_fmt'] = df_display_portfolio['Rentabilidad'].apply(lambda x: formato_argentino(x, 2))
         df_display_portfolio['Neto_fmt'] = df_display_portfolio['Neto'].apply(lambda x: formato_argentino(x, 2))
         df_display_portfolio['Gastos_fmt'] = df_display_portfolio['Gastos'].apply(lambda x: formato_argentino(x, 0, signo_pesos=False) if pd.notna(x) and x > 0 else '')
-        # IMPORTANTE: Mostrar solo gastos extraordinarios editables (sin retiro mensual)
-        df_display_portfolio['Gastos_extra_fmt'] = df_display_portfolio['Gastos_extra'].apply(lambda x: formato_argentino(x, 0, signo_pesos=False) if pd.notna(x) and x > 0 else '')
         
         # Crear DataFrame para mostrar con columnas formateadas
         df_para_editar_portfolio = pd.DataFrame({
@@ -3275,19 +3256,19 @@ def main():
             'Acumulado': df_display_portfolio['Acumulado_fmt'],
             'Rentabilidad': df_display_portfolio['Rentabilidad_fmt'],
             'Neto': df_display_portfolio['Neto_fmt'],
-            'Gastos': df_display_portfolio['Gastos_extra_fmt']  # Solo extraordinarios en columna editable
+            'Gastos': df_display_portfolio['Gastos_fmt']
         })
         
         # Configurar columnas editables (solo Gastos es editable)
         column_config_portfolio = {
-            "Mes": st.column_config.TextColumn("Mes", disabled=True, width="small"),
-            "Acumulado": st.column_config.TextColumn("Acumulado", disabled=True),
-            "Rentabilidad": st.column_config.TextColumn("Rentabilidad", disabled=True),
-            "Neto": st.column_config.TextColumn("Neto", disabled=True),
+            "Mes": st.column_config.TextColumn("Mes", disabled=True, width=120),
+            "Acumulado": st.column_config.TextColumn("Acumulado", disabled=True, width=120),
+            "Rentabilidad": st.column_config.TextColumn("Rentabilidad", disabled=True, width=120),
+            "Neto": st.column_config.TextColumn("Neto", disabled=True, width=120),
             "Gastos": st.column_config.TextColumn(
                 "Gastos",
-                help="Edita el monto de gastos extraordinarios para este mes (formato: 10.000.000)",
-                width="medium"
+                help="Edita el monto de gastos para este mes (formato: 10.000.000)",
+                width=120
             )
         }
         
@@ -3330,13 +3311,6 @@ def main():
                 key="tabla_portfolio"
             )
         
-        # Botón para limpiar gastos
-        col_btn1_pf, col_btn2_pf, col_spacer_btn_pf = st.columns([1, 1, 3])
-        with col_btn1_pf:
-            if st.button("Limpiar gastos", type="secondary", key="limpiar_gastos_portfolio"):
-                st.session_state.gastos_portfolio = {}
-                st.rerun()
-        
         # Extraer gastos editados y actualizar session_state
         gastos_dict_editado_portfolio = {}
         cambios_detectados_portfolio = False
@@ -3378,7 +3352,6 @@ def main():
             pct_fci_usd=pct_usd,
             tasa_fci_usd=tasa_usd,
             inflacion_mensual=inflacion,
-            retiro_mensual=retiro_mensual,
             meses=meses_portfolio,
             gastos_iniciales=st.session_state.gastos_portfolio
         )
@@ -3391,7 +3364,7 @@ def main():
             'Acumulado': formato_argentino(fila_total_portfolio['Acumulado'], 2),
             'Rentabilidad': formato_argentino(fila_total_portfolio['Rentabilidad'], 2),
             'Neto': formato_argentino(fila_total_portfolio['Neto'], 2),
-            'Gastos': formato_argentino(fila_total_portfolio['Gastos_extra'], 0) if pd.notna(fila_total_portfolio['Gastos_extra']) else ''
+            'Gastos': formato_argentino(fila_total_portfolio['Gastos'], 0) if pd.notna(fila_total_portfolio['Gastos']) else ''
         }])
         
         st.dataframe(
@@ -3399,13 +3372,20 @@ def main():
             use_container_width=True,
             hide_index=True,
             column_config={
-                "Mes": st.column_config.TextColumn("Mes", width="small"),
-                "Acumulado": st.column_config.TextColumn("Acumulado"),
-                "Rentabilidad": st.column_config.TextColumn("Rentabilidad"),
-                "Neto": st.column_config.TextColumn("Neto"),
-                "Gastos": st.column_config.TextColumn("Gastos")
+                "Mes": st.column_config.TextColumn("Mes", width=120),
+                "Acumulado": st.column_config.TextColumn("Acumulado", width=120),
+                "Rentabilidad": st.column_config.TextColumn("Rentabilidad", width=120),
+                "Neto": st.column_config.TextColumn("Neto", width=120),
+                "Gastos": st.column_config.TextColumn("Gastos", width=120)
             }
         )
+        
+        # Botón para limpiar gastos
+        col_btn1_pf, col_btn2_pf, col_spacer_btn_pf = st.columns([1, 1, 3])
+        with col_btn1_pf:
+            if st.button("Limpiar gastos", type="secondary", key="limpiar_gastos_portfolio"):
+                st.session_state.gastos_portfolio = {}
+                st.rerun()
         
         # Resumen de resultados
         st.markdown('<p style="margin-top: 1rem; margin-bottom: 0.5rem; font-weight: 500;">Resumen</p>', unsafe_allow_html=True)
