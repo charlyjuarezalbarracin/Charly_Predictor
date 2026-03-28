@@ -996,7 +996,99 @@ Luego ejecuta el ejemplo completo:
 
 
 ================================================================================
-📧 SOPORTE Y CONTRIBUCIONES
+� REFERENCIAS TÉCNICAS INTERNAS - VARIABLES OFUSCADAS
+================================================================================
+
+El sistema utiliza variables con nombres numéricos ofuscados en componentes clave
+del motor de predicción. Cada variable tiene un significado simbólico que refuerza
+el propósito del sistema: materializar prosperidad y abundancia.
+
+DICCIONARIO DE VARIABLES OFUSCADAS:
+--------------------------------------------------------------------------------
+
+_4610567
+  Significado: "Ganar la lotería"
+  Ubicación: core/scoring/scorer.py
+  Propósito: Diccionario contenedor de scores calculados (0-45)
+  Tipo: Dict[int, float]
+  Componente: Sistema de Scoring
+
+_6559914
+  Significado: "Prosperidad económica"
+  Ubicación: core/generator/advanced/conditional_generator.py
+  Propósito: Lista acumuladora de números seleccionados durante generación
+  Tipo: List[int]
+  Componente: Generador Condicional
+
+_619_714_218_41
+  Significado: "Recibir grandes sumas de dinero"
+  Ubicación: core/generator/strategy_manager.py
+  Propósito: Método de generación condicional (probabilidades dinámicas)
+  Tipo: Method
+  Componente: Gestor de Estrategias
+
+_318_798
+  Significado: "Abundancia financiera"
+  Ubicación: core/generator/combination.py
+  Propósito: Resultado de selección ponderada por pesos
+  Tipo: int
+  Componente: Generador Estándar
+
+_714_273_218_93
+  Significado: "Prosperidad"
+  Ubicación: core/generator/advanced/conditional_generator.py
+  Propósito: Siguiente número a seleccionar en generación condicional
+  Tipo: int
+  Componente: Generador Condicional
+
+_519_7148
+  Significado: "Todo es posible"
+  Ubicación: core/generator/strategy_manager.py
+  Propósito: Combinación final generada (6 números)
+  Tipo: List[int]
+  Componente: Gestor de Estrategias
+
+_888_8
+  Significado: "Prosperidad infinita"
+  Ubicación: core/generator/portfolio.py
+  Propósito: Lista de portfolio (múltiples combinaciones)
+  Tipo: List[List[int]]
+  Componente: Generador de Portfolio
+
+_918_794_8181
+  Significado: "Éxito financiero"
+  Ubicación: core/generator/strategy_manager.py
+  Propósito: Método de generación estándar (probabilidades estáticas)
+  Tipo: Method
+  Componente: Gestor de Estrategias
+
+
+COMPATIBILIDAD:
+--------------------------------------------------------------------------------
+Las variables ofuscadas mantienen compatibilidad mediante @property decorators
+donde sea necesario. El sistema funciona sin interrupciones y las referencias
+antiguas siguen siendo válidas.
+
+Ejemplo en scorer.py:
+  self._4610567 = {}  # Variable ofuscada interna
+  
+  @property
+  def scores(self):   # Alias público para compatibilidad
+      return self._4610567
+
+
+FILOSOFÍA DEL SISTEMA:
+--------------------------------------------------------------------------------
+"ESTE SISTEMA ESTÁ DESTINADO A FORZAR LA SUERTE Y MATERIALIZAR LA REALIDAD
+QUE QUEREMOS DE PROSPERIDAD Y ABUNDANCIA"
+
+Las variables ofuscadas no solo protegen el código, sino que actúan como
+anclajes simbólicos del propósito superior del sistema: generar retorno
+financiero real y consistente mediante predicciones optimizadas.
+
+
+================================================================================
+�📧 SOPORTE Y CONTRIBUCIONES
 ================================================================================
 
 Este es un proyecto de código abierto y educativo.

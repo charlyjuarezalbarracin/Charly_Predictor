@@ -505,10 +505,10 @@ def obtener_pozos_ultimo_sorteo():
                                 pozos['Revancha'] = {'premio': premio, 'ganadores': col2_texto}
                                 print(f"  Revancha: ${premio} - {col2_texto}")
                             
-                            # Siempre Sale: primer premio de 5 aciertos
-                            elif es_siempre_sale and aciertos == '5' and pozos['SiempreSale']['premio'] is None:
+                            # Siempre Sale: primer premio (cualquier cantidad de aciertos 1-6)
+                            elif es_siempre_sale and pozos['SiempreSale']['premio'] is None:
                                 pozos['SiempreSale'] = {'premio': premio, 'ganadores': col2_texto}
-                                print(f"  Siempre Sale: ${premio} - {col2_texto}")
+                                print(f"  Siempre Sale: ${premio} - {col2_texto} ({aciertos} aciertos)")
                     
                     except Exception:
                         continue
@@ -564,9 +564,9 @@ def obtener_pozos_ultimo_sorteo():
                                     elif aciertos == '6' and 'revancha' in titulo and pozos['Revancha']['premio'] is None:
                                         pozos['Revancha'] = {'premio': premio, 'ganadores': col2_texto}
                                         print(f"  Revancha: ${premio} - {col2_texto}")
-                                    elif aciertos == '5' and 'siempre sale' in titulo and pozos['SiempreSale']['premio'] is None:
+                                    elif 'siempre sale' in titulo and pozos['SiempreSale']['premio'] is None:
                                         pozos['SiempreSale'] = {'premio': premio, 'ganadores': col2_texto}
-                                        print(f"  Siempre Sale: ${premio} - {col2_texto}")
+                                        print(f"  Siempre Sale: ${premio} - {col2_texto} ({aciertos} aciertos)")
                             
                             except Exception:
                                 continue

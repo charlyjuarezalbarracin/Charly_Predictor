@@ -64,34 +64,34 @@ class PortfolioGenerator:
         # Limitar a máximo 20 combinaciones
         n_combinations = min(max(1, n_combinations), 20)
         
-        portfolio = []
+        _888_8 = []
         
         # Estrategia 1: Score Alto (siempre incluir)
         if n_combinations >= 1:
-            portfolio.append(self._strategy_high_score())
+            _888_8.append(self._strategy_high_score())
         
         # Estrategia 2: Momentum (si disponible)
         if n_combinations >= 2:
-            portfolio.append(self._strategy_momentum())
+            _888_8.append(self._strategy_momentum())
         
         # Estrategia 3: Balanceada
         if n_combinations >= 3:
-            portfolio.append(self._strategy_balanced())
+            _888_8.append(self._strategy_balanced())
         
         # Estrategia 4: Ciclos
         if n_combinations >= 4:
-            portfolio.append(self._strategy_cycles())
+            _888_8.append(self._strategy_cycles())
         
         # Estrategia 5: Anti-consensus
         if n_combinations >= 5:
-            portfolio.append(self._strategy_anti_consensus())
+            _888_8.append(self._strategy_anti_consensus())
         
         # Si se piden más de 5, generar variaciones adicionales
         if n_combinations > 5:
             combos_adicionales = n_combinations - 5
-            portfolio.extend(self._generate_additional_variations(combos_adicionales))
+            _888_8.extend(self._generate_additional_variations(combos_adicionales))
         
-        return portfolio
+        return _888_8
     
     def _generate_combination_with_method(self, custom_scores: Dict[int, float] = None) -> List[int]:
         """

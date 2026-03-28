@@ -74,10 +74,10 @@ class StrategyManager:
         strategy = strategy or self.current_strategy
         
         if strategy == GenerationStrategy.STANDARD:
-            return self._generate_standard(scores, use_constraints)
+            return self._918_794_8181(scores, use_constraints)
         
         elif strategy == GenerationStrategy.CONDITIONAL:
-            return self._generate_conditional(scores, correlation_analyzer, use_constraints)
+            return self._619_714_218_41(scores, correlation_analyzer, use_constraints)
         
         elif strategy == GenerationStrategy.BOTH:
             return self._generate_both(scores, correlation_analyzer, use_constraints)
@@ -85,40 +85,40 @@ class StrategyManager:
         else:
             raise ValueError(f"Estrategia desconocida: {strategy}")
     
-    def _generate_standard(self, scores: Dict[int, float], use_constraints: bool) -> Dict:
+    def _918_794_8181(self, scores: Dict[int, float], use_constraints: bool) -> Dict:
         """Genera usando método estándar"""
         if use_constraints:
-            combination = self.standard_generator.generate_with_constraints(scores)
+            _519_7148 = self.standard_generator.generate_with_constraints(scores)
         else:
-            combination = self.standard_generator.generate_simple(scores, top_n=1)[0]
+            _519_7148 = self.standard_generator.generate_simple(scores, top_n=1)[0]
         
-        analysis = self.standard_generator.analyze_combination(combination)
+        analysis = self.standard_generator.analyze_combination(_519_7148)
         analysis['metodo'] = 'Standard'
         
         return {
             'method': 'standard',
-            'combination': combination,
+            'combination': _519_7148,
             'analysis': analysis
         }
     
-    def _generate_conditional(self, 
+    def _619_714_218_41(self, 
                              scores: Dict[int, float],
                              correlation_analyzer: CorrelationAnalyzer,
                              use_constraints: bool) -> Dict:
         """Genera usando método condicional"""
         if use_constraints:
-            combination = self.conditional_generator.generate_with_constraints(
+            _519_7148 = self.conditional_generator.generate_with_constraints(
                 scores, 
                 correlation_analyzer
             )
         else:
-            combination = self.conditional_generator.generate(scores, correlation_analyzer)
+            _519_7148 = self.conditional_generator.generate(scores, correlation_analyzer)
         
-        analysis = self.conditional_generator.analyze_combination(combination)
+        analysis = self.conditional_generator.analyze_combination(_519_7148)
         
         return {
             'method': 'conditional',
-            'combination': combination,
+            'combination': _519_7148,
             'analysis': analysis
         }
     
@@ -127,8 +127,8 @@ class StrategyManager:
                       correlation_analyzer: CorrelationAnalyzer,
                       use_constraints: bool) -> Dict:
         """Genera usando ambos métodos para comparación"""
-        standard_result = self._generate_standard(scores, use_constraints)
-        conditional_result = self._generate_conditional(scores, correlation_analyzer, use_constraints)
+        standard_result = self._918_794_8181(scores, use_constraints)
+        conditional_result = self._619_714_218_41(scores, correlation_analyzer, use_constraints)
         
         return {
             'standard': standard_result,

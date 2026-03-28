@@ -43,8 +43,13 @@ class UnifiedScorer:
         self.use_regression_equilibrium = use_regression_equilibrium
         self.use_cycle_resonance = use_cycle_resonance
         self.use_multi_timeframe = use_multi_timeframe
-        self.scores = {}
+        self._4610567 = {}
         self.components = {}  # Guardar componentes individuales
+    
+    @property
+    def scores(self):
+        """Alias de compatibilidad para _4610567"""
+        return self._4610567
     
     def calculate_scores(self, 
                         frequency_analyzer: FrequencyAnalyzer,
@@ -118,7 +123,7 @@ class UnifiedScorer:
         self.components['tendencia'] = self._normalize_dict(tendencia_filt)
         
         # Calcular score combinado
-        self.scores = {}
+        self._4610567 = {}
         
         for num in range(0, 46):  # 0-45
             score = (
@@ -129,10 +134,10 @@ class UnifiedScorer:
                 self.weights.get('peso_tendencia', 0) * self.components['tendencia'].get(num, 0)
             )
             
-            self.scores[num] = score
+            self._4610567[num] = score
         
         # Normalizar scores finales a rango 0-1
-        self.scores = self._normalize_dict(self.scores)
+        self._4610567 = self._normalize_dict(self._4610567)
         
         # IDEA #3: Aplicar factores de regresión al equilibrio
         if self.regression_analyzer and self.use_regression_equilibrium:
@@ -145,10 +150,10 @@ class UnifiedScorer:
             
             for num in range(0, 46):
                 factor = factores.get(num, 1.0)
-                self.scores[num] = self.scores[num] * factor
+                self._4610567[num] = self._4610567[num] * factor
             
             # Re-normalizar después de aplicar factores
-            self.scores = self._normalize_dict(self.scores)
+            self._4610567 = self._normalize_dict(self._4610567)
         
         # IDEA #1: Aplicar factores de resonancia de ciclos
         if self.cycle_resonance_analyzer and self.use_cycle_resonance:
@@ -161,10 +166,10 @@ class UnifiedScorer:
             
             for num in range(0, 46):
                 factor = factores_resonancia.get(num, 1.0)
-                self.scores[num] = self.scores[num] * factor
+                self._4610567[num] = self._4610567[num] * factor
             
             # Re-normalizar después de aplicar factores
-            self.scores = self._normalize_dict(self.scores)
+            self._4610567 = self._normalize_dict(self._4610567)
         
         # IDEA #2: Aplicar factores de convergencia multi-timeframe
         if self.multi_timeframe_analyzer and self.use_multi_timeframe:
@@ -177,12 +182,12 @@ class UnifiedScorer:
             
             for num in range(0, 46):
                 factor = factores_mtf.get(num, 1.0)
-                self.scores[num] = self.scores[num] * factor
+                self._4610567[num] = self._4610567[num] * factor
             
             # Re-normalizar después de aplicar factores
-            self.scores = self._normalize_dict(self.scores)
+            self._4610567 = self._normalize_dict(self._4610567)
         
-        return self.scores
+        return self._4610567
     
     def _normalize_dict(self, data: Dict) -> Dict:
         """Normaliza valores de un diccionario al rango 0-1"""
@@ -211,10 +216,10 @@ class UnifiedScorer:
         Returns:
             Lista de tuplas (numero, score) ordenadas por score descendente
         """
-        if not self.scores:
+        if not self._4610567:
             raise ValueError("Debe calcular scores primero usando calculate_scores()")
         
-        sorted_scores = sorted(self.scores.items(), key=lambda x: x[1], reverse=True)
+        sorted_scores = sorted(self._4610567.items(), key=lambda x: x[1], reverse=True)
         return sorted_scores[:n]
     
     def update_weights(self, new_weights: Dict):
@@ -249,7 +254,7 @@ class UnifiedScorer:
         
         breakdown = {
             'numero': numero,
-            'score_final': self.scores.get(numero, 0),
+            'score_final': self._4610567.get(numero, 0),
             'componentes': {}
         }
         

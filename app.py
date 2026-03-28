@@ -2437,7 +2437,7 @@ def main():
         # Botón con el mismo ancho que las 6 esferas
         cols_button = st.columns([0.25, 0.5, 0.25])
         with cols_button[1]:
-            verificar = st.button("Verificar", type="primary", use_container_width=True)
+            verificar = st.button("Verificar", type="primary", width='stretch')
         
         # Validaciones
         if verificar:
@@ -2759,7 +2759,7 @@ def main():
                             hovermode='x unified'
                         )
                         
-                        st.plotly_chart(fig, use_container_width=True)
+                        st.plotly_chart(fig, width='stretch')
                         
                         # Interpretación
                         st.markdown("### Interpretación")
@@ -3025,7 +3025,7 @@ def main():
             df_editado = st.data_editor(
                 df_para_editar,
                 column_config=column_config,
-                use_container_width=True,
+                width='stretch',
                 hide_index=True,
                 num_rows="fixed",
                 height=altura_tabla,
@@ -3037,7 +3037,7 @@ def main():
             df_editado = st.data_editor(
                 df_para_editar,
                 column_config=column_config,
-                use_container_width=True,
+                width='stretch',
                 hide_index=True,
                 num_rows="fixed",
                 height=altura_fija,
@@ -3101,7 +3101,7 @@ def main():
         
         st.dataframe(
             df_total,
-            use_container_width=True,
+            width='stretch',
             hide_index=True,
             column_config={
                 "Mes": st.column_config.TextColumn("Mes", width=120),
@@ -3293,7 +3293,7 @@ def main():
             df_editado_portfolio = st.data_editor(
                 df_para_editar_portfolio,
                 column_config=column_config_portfolio,
-                use_container_width=True,
+                width='stretch',
                 hide_index=True,
                 num_rows="fixed",
                 height=altura_tabla_portfolio,
@@ -3304,7 +3304,7 @@ def main():
             df_editado_portfolio = st.data_editor(
                 df_para_editar_portfolio,
                 column_config=column_config_portfolio,
-                use_container_width=True,
+                width='stretch',
                 hide_index=True,
                 num_rows="fixed",
                 height=altura_fija,
@@ -3369,7 +3369,7 @@ def main():
         
         st.dataframe(
             df_total_portfolio,
-            use_container_width=True,
+            width='stretch',
             hide_index=True,
             column_config={
                 "Mes": st.column_config.TextColumn("Mes", width=120),
@@ -3469,7 +3469,7 @@ def main():
         # Formatear eje Y con puntos de miles
         fig_comparativo.update_yaxes(tickformat="$,.0f", separatethousands=True)
         
-        st.plotly_chart(fig_comparativo, use_container_width=True)
+        st.plotly_chart(fig_comparativo, width='stretch')
 
 
 # ============================================================================
