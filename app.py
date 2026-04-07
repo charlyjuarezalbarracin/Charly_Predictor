@@ -18,6 +18,7 @@ from core.data import DataLoader
 from core.analysis import FrequencyAnalyzer, CorrelationAnalyzer, PatternAnalyzer
 from core.scoring import UnifiedScorer
 from core.generator import StrategyManager, GenerationStrategy, PortfolioGenerator
+from core.generator.optimizer import CombinationOptimizer
 from core.backtesting import WalkForwardBacktester
 from utils.data_generator import generate_sample_data
 from varios.scraper_quiniya_final import actualizar_historico_csv, obtener_pozos_ultimo_sorteo
@@ -1911,7 +1912,7 @@ def main():
         
         # 3. MULTI-COMBINACIONES
         st.markdown("---")
-        st.markdown("### Generación Múltiple")
+        # st.markdown("### Generación Múltiple")
         
         usar_portfolio = st.checkbox(
             "Generar múltiples combinaciones",
@@ -1932,7 +1933,16 @@ def main():
         
         st.markdown("---")
         
-        # 4. PARÁMETROS AVANZADOS
+        # 4. OPTIMIZER
+        usar_optimizer = st.checkbox(
+            "Optimizer (Mejor Estadísticas)",
+            value=False,
+            help="Genera 5000 combinaciones internas y selecciona la de mejor balance entre score, suma (~137), pares (3/6) y spread"
+        )
+        
+        st.markdown("---")
+        
+        # 5. PARÁMETROS AVANZADOS
         st.markdown("### Parámetros")
         
         with st.expander("Avanzados"):
@@ -2203,7 +2213,8 @@ def main():
             
             # GENERACIÓN TRADICIONAL (sin portfolio)
             else:
-                with st.spinner("Generando predicción..."):
+                spinner_text = "Optimizando predicción (Monte Carlo 5000 iteraciones)..." if usar_optimizer else "Generando predicción..."
+                with st.spinner(spinner_text):
                     manager = StrategyManager()
                     
                     # Ajustar peso de correlaciones si es condicional
@@ -2217,6 +2228,41 @@ def main():
                         correlation_analyzer=corr_analyzer,
                         use_constraints=True
                     )
+                    
+                    # Si optimizer activo, reemplazar combinaciones por las óptimas
+                    if usar_optimizer:
+                        optimizer = CombinationOptimizer()
+                        
+                        if metodo == GenerationStrategy.BOTH:
+                            # Optimizar estándar - búsqueda 1
+                            best_std, _ = optimizer.best_combination_search(scores, iterations=5000)
+                            result['standard']['combination'] = best_std
+                            analysis_std = result['standard']['analysis']
+                            analysis_std['suma_total'] = sum(best_std)
+                            analysis_std['pares'] = sum(1 for n in best_std if n % 2 == 0)
+                            analysis_std['impares'] = 6 - analysis_std['pares']
+                            analysis_std['score_promedio'] = sum(scores.get(n, 0) for n in best_std) / 6
+                            analysis_std['consecutivos'] = sum(1 for i in range(5) if best_std[i+1] - best_std[i] == 1)
+                            
+                            # Optimizar condicional - búsqueda 2 (excluye la mejor anterior para diversidad)
+                            scores_cond = {k: v * (0.7 if k in best_std else 1.0) for k, v in scores.items()}
+                            best_cond, _ = optimizer.best_combination_search(scores_cond, iterations=5000)
+                            result['conditional']['combination'] = best_cond
+                            analysis_cond = result['conditional']['analysis']
+                            analysis_cond['suma_total'] = sum(best_cond)
+                            analysis_cond['pares'] = sum(1 for n in best_cond if n % 2 == 0)
+                            analysis_cond['impares'] = 6 - analysis_cond['pares']
+                            analysis_cond['score_promedio'] = sum(scores.get(n, 0) for n in best_cond) / 6
+                            analysis_cond['consecutivos'] = sum(1 for i in range(5) if best_cond[i+1] - best_cond[i] == 1)
+                        else:
+                            best, _ = optimizer.best_combination_search(scores, iterations=5000)
+                            result['combination'] = best
+                            analysis = result['analysis']
+                            analysis['suma_total'] = sum(best)
+                            analysis['pares'] = sum(1 for n in best if n % 2 == 0)
+                            analysis['impares'] = 6 - analysis['pares']
+                            analysis['score_promedio'] = sum(scores.get(n, 0) for n in best) / 6
+                            analysis['consecutivos'] = sum(1 for i in range(5) if best[i+1] - best[i] == 1)
                     
                     st.markdown("---")
                     
@@ -2262,14 +2308,15 @@ def main():
                                 st.metric("Correlation", f"{analysis_cond['correlation_score']:.3f}")
                         
                         # Agregar ambas al historial
+                        sufijo_opt = " + Optimizer" if usar_optimizer else ""
                         agregar_al_historial(
                             result['standard']['combination'],
-                            "Estándar",
+                            f"Estándar{sufijo_opt}",
                             analysis_std
                         )
                         agregar_al_historial(
                             result['conditional']['combination'],
-                            "Condicional",
+                            f"Condicional{sufijo_opt}",
                             analysis_cond
                         )
                         
@@ -2327,6 +2374,8 @@ def main():
                         
                         # Agregar al historial
                         metodo_nombre = "Estándar" if metodo == GenerationStrategy.STANDARD else "Condicional"
+                        if usar_optimizer:
+                            metodo_nombre += " + Optimizer"
                         agregar_al_historial(
                             result['combination'],
                             metodo_nombre,

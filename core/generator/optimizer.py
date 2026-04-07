@@ -224,6 +224,66 @@ class CombinationOptimizer:
         """Función de fitness por defecto (suma de scores)"""
         return sum(self.scores.get(num, 0) for num in combination)
     
+    def _quality_fitness(self, combination: List[int]) -> float:
+        """
+        Fitness que combina score + calidad estadística.
+        Penaliza combinaciones con stats alejadas de las distribuciones reales.
+        """
+        nums = sorted(combination)
+        
+        # 1. Score base (50% del fitness)
+        score_sum = sum(self.scores.get(num, 0) for num in nums)
+        max_possible = 6.0  # 6 numeros con score max 1.0
+        score_norm = score_sum / max_possible if max_possible > 0 else 0
+        
+        # 2. Penalización por suma alejada del centro 137 (25%)
+        suma = sum(nums)
+        dist_suma = abs(suma - 137) / 137  # 0 = perfecto, 1 = muy lejos
+        suma_score = max(0, 1 - dist_suma * 2)
+        
+        # 3. Penalización por pares desequilibrados (15%)
+        pares = sum(1 for n in nums if n % 2 == 0)
+        # 3 pares = 1.0, 2 o 4 = 0.8, 1 o 5 = 0.3, 0 o 6 = 0.0
+        pares_scores = {0: 0.0, 1: 0.3, 2: 0.8, 3: 1.0, 4: 0.8, 5: 0.3, 6: 0.0}
+        pares_score = pares_scores.get(pares, 0)
+        
+        # 4. Spread (10%) - diferencia entre mayor y menor, ideal > 25
+        spread = nums[-1] - nums[0]
+        spread_score = min(1.0, spread / 35)  # 35+ = perfecto
+        
+        return 0.50 * score_norm + 0.25 * suma_score + 0.15 * pares_score + 0.10 * spread_score
+    
+    def best_combination_search(self, scores: Dict[int, float],
+                                 iterations: int = 5000) -> Tuple[List[int], float]:
+        """
+        Genera muchas combinaciones y retorna la mejor según quality_fitness.
+        
+        Returns:
+            Tupla (mejor_combinacion, fitness_score)
+        """
+        self.scores = scores
+        
+        numbers = list(scores.keys())
+        weights = list(scores.values())
+        total_weight = sum(weights)
+        probabilities = [w / total_weight for w in weights] if total_weight > 0 else None
+        
+        best_combo = None
+        best_fitness = -float('inf')
+        
+        for _ in range(iterations):
+            if probabilities:
+                combo = sorted(np.random.choice(numbers, size=6, replace=False, p=probabilities).tolist())
+            else:
+                combo = sorted(random.sample(numbers, 6))
+            
+            fitness = self._quality_fitness(combo)
+            if fitness > best_fitness:
+                best_fitness = fitness
+                best_combo = combo
+        
+        return best_combo, best_fitness
+    
     def _tournament_selection(self, fitness_scores: List[Tuple], tournament_size: int = 5) -> List[int]:
         """Selección por torneo"""
         tournament = random.sample(fitness_scores, min(tournament_size, len(fitness_scores)))
