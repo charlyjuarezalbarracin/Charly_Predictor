@@ -22,7 +22,7 @@ freq_analyzer.analyze(data)
 print("📊 TOP 10 - FRECUENCIA ABSOLUTA (Histórico Completo)")
 print("-" * 70)
 freq_abs = freq_analyzer.results['frecuencia_absoluta']
-sorted_freq = sorted(freq_abs.items(), key=lambda x: x[1], reverse=True)[:10]
+sorted_freq = sorted(freq_abs.items(), key=lambda x: (-x[1], x[0]))[:10]
 for i, (num, count) in enumerate(sorted_freq, 1):
     pct = (count / len(data)) * 100
     bars = "█" * int(pct / 2)
@@ -41,7 +41,7 @@ for i, (num, count) in enumerate(calientes, 1):
 print(f"\n🔥 TOP 10 - FRECUENCIA RECIENTE (Últimos 50 sorteos ~ 1.5 meses)")
 print("-" * 70)
 freq_reciente = freq_analyzer.results['frecuencia_reciente']
-sorted_reciente = sorted(freq_reciente.items(), key=lambda x: x[1], reverse=True)[:10]
+sorted_reciente = sorted(freq_reciente.items(), key=lambda x: (-x[1], x[0]))[:10]
 for i, (num, count) in enumerate(sorted_reciente, 1):
     pct = (count / 50) * 100
     bars = "█" * int(pct / 2)
@@ -56,18 +56,22 @@ print(f"{'='*70}\n")
 from collections import defaultdict
 scores = defaultdict(float)
 
+# Obtener top 15 de frecuencia absoluta con determinismo
+sorted_freq_15 = sorted(freq_abs.items(), key=lambda x: (-x[1], x[0]))[:15]
+
 # Puntaje por frecuencia absoluta (normalizado)
-max_freq = sorted_freq[0][1]
-for num, count in sorted_freq[:15]:  # Top 15
+max_freq = sorted_freq_15[0][1]
+for num, count in sorted_freq_15:
     scores[num] += (count / max_freq) * 50  # 50% peso
 
-# Puntaje por calientes (normalizado)
-max_caliente = calientes[0][1]
-for num, count in calientes[:15]:  # Top 15
+# Puntaje por calientes (normalizado) - usar freq_reciente con determinismo
+calientes_sorted = sorted(freq_reciente.items(), key=lambda x: (-x[1], x[0]))[:15]
+max_caliente = calientes_sorted[0][1]
+for num, count in calientes_sorted:
     scores[num] += (count / max_caliente) * 50  # 50% peso
 
-# Ordenar por score combinado
-top_candidatos = sorted(scores.items(), key=lambda x: x[1], reverse=True)[:6]
+# Ordenar por score combinado con determinismo en empates
+top_candidatos = sorted(scores.items(), key=lambda x: (-x[1], x[0]))[:6]
 
 print("Número | Score Combinado | Freq.Absoluta | Freq.Reciente")
 print("-" * 70)

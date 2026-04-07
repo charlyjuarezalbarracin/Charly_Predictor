@@ -1464,6 +1464,55 @@ def mostrar_analisis_multi_timeframe(multi_timeframe_analyzer):
             st.markdown(f"{i}. **Número {num}** - {ventanas}/{len(summary['ventanas_analizadas'])} ventanas ({pct:.0f}%)")
 
 
+def generar_prediccion_rapida(freq_analyzer):
+    """
+    Genera predicción simple combinando frecuencia absoluta + calientes.
+    NO usa scoring complejo, solo combina 50% frecuencia + 50% calientes.
+    Replica EXACTAMENTE el comportamiento de analisis_rapido.py
+    """
+    from collections import defaultdict
+    
+    # Obtener datos del freq_analyzer
+    freq_abs = freq_analyzer.results['frecuencia_absoluta']
+    freq_reciente = freq_analyzer.results['frecuencia_reciente']
+    
+    # Crear ranking por frecuencia absoluta - determinismo en empates
+    sorted_freq = sorted(freq_abs.items(), key=lambda x: (-x[1], x[0]))[:15]
+    
+    # Crear números calientes con determinismo en empates
+    # Ordenar por frecuencia descendente, luego por número ascendente para consistencia
+    calientes = sorted(freq_reciente.items(), key=lambda x: (-x[1], x[0]))[:10]
+    
+    # Crear scores combinados
+    scores = defaultdict(float)
+    
+    # Puntaje por frecuencia absoluta (normalizado) - 50% peso
+    max_freq = sorted_freq[0][1]
+    for num, count in sorted_freq:
+        scores[num] += (count / max_freq) * 50
+    
+    # Puntaje por calientes (normalizado) - 50% peso
+    max_caliente = calientes[0][1]
+    for num, count in calientes[:15]:
+        scores[num] += (count / max_caliente) * 50
+    
+    # Ordenar por score combinado (desc) y luego por número (asc) para determinismo en empates
+    top_candidatos = sorted(scores.items(), key=lambda x: (-x[1], x[0]))[:6]
+    numeros = sorted([num for num, _ in top_candidatos])
+    
+    # Calcular estadísticas
+    suma = sum(numeros)
+    pares = sum(1 for n in numeros if n % 2 == 0)
+    score_promedio = sum(score for _, score in top_candidatos) / 6
+    
+    return {
+        'numeros': numeros,
+        'suma': suma,
+        'pares': pares,
+        'impares': 6 - pares,
+        'score_promedio': score_promedio,
+        'detalles': dict(top_candidatos)
+    }
 
 
 # ============================================================================
@@ -2223,6 +2272,36 @@ def main():
                             "Condicional",
                             analysis_cond
                         )
+                        
+                        # ANÁLISIS RÁPIDO - Tercera opción (sin scoring complejo)
+                        st.markdown("---")
+                        st.markdown("### Análisis Rápido (Frecuencia + Calientes)")
+                        st.caption("Combinación simple: 50% frecuencia histórica + 50% números calientes recientes")
+                        
+                        prediccion_rapida = generar_prediccion_rapida(freq_analyzer)
+                        mostrar_numeros_predichos(prediccion_rapida['numeros'], "")
+                        
+                        st.markdown("##### Estadísticas")
+                        subcol1, subcol2, subcol3 = st.columns(3)
+                        with subcol1:
+                            st.metric("Suma", prediccion_rapida['suma'])
+                        with subcol2:
+                            st.metric("Score Simple", f"{prediccion_rapida['score_promedio']:.1f}")
+                        with subcol3:
+                            st.metric("Pares", f"{prediccion_rapida['pares']}/6")
+                        
+                        # Agregar al historial
+                        agregar_al_historial(
+                            prediccion_rapida['numeros'],
+                            "Análisis Rápido",
+                            {
+                                'suma_total': prediccion_rapida['suma'],
+                                'score_promedio': prediccion_rapida['score_promedio'],
+                                'pares': prediccion_rapida['pares'],
+                                'impares': prediccion_rapida['impares'],
+                                'consecutivos': 0
+                            }
+                        )
                     
                     else:
                         # UN SOLO MÉTODO
@@ -2259,7 +2338,8 @@ def main():
                     if metodo == GenerationStrategy.BOTH:
                         nums_std = ', '.join([f"{int(n):02d}" for n in result['standard']['combination']])
                         nums_cond = ', '.join([f"{int(n):02d}" for n in result['conditional']['combination']])
-                        texto_copiar = f"Estándar: {nums_std}\nCondicional: {nums_cond}"
+                        nums_rapido = ', '.join([f"{int(n):02d}" for n in prediccion_rapida['numeros']])
+                        texto_copiar = f"Estándar: {nums_std}\nCondicional: {nums_cond}\nRápido: {nums_rapido}"
                     else:
                         texto_copiar = ', '.join([f"{int(n):02d}" for n in result['combination']])
                     
@@ -2793,21 +2873,41 @@ def main():
         if len(st.session_state.historial) == 0:
             st.info("No hay predicciones en el historial todavía. ¡Genera tu primera predicción!")
         else:
+            # Agrupar predicciones por timestamp (misma fecha/hora = misma sesión)
+            from collections import OrderedDict
+            grupos_historial = OrderedDict()
             for i, entry in enumerate(st.session_state.historial):
-                with st.expander(f"Predicción #{len(st.session_state.historial) - i} - {entry['timestamp']} - Método: {entry['metodo']}"):
-                    col1, col2 = st.columns([2, 1])
-                    
-                    with col1:
-                        st.markdown("Números:")
+                ts = entry['timestamp']
+                if ts not in grupos_historial:
+                    grupos_historial[ts] = []
+                grupos_historial[ts].append(entry)
+            
+            for ts, entries in grupos_historial.items():
+                n_preds = len(entries)
+                metodos = ', '.join([e['metodo'] for e in entries])
+                label = f"{ts} - {n_preds} prediccion{'es' if n_preds > 1 else ''}"
+                
+                with st.expander(label):
+                    for entry in entries:
                         numeros_texto = ', '.join([f"{n:02d}" for n in entry['prediccion']])
-                        st.markdown(f"### {numeros_texto}")
-                    
-                    with col2:
-                        st.markdown("Estadísticas:")
+                        
+                        # Construir stats inline
+                        stats_parts = []
                         if 'suma_total' in entry['scores']:
-                            st.write(f"Suma: {entry['scores']['suma_total']}")
-                            st.write(f"Score: {entry['scores']['score_promedio']:.3f}")
-                            st.write(f"Pares: {entry['scores']['pares']}/6")
+                            stats_parts.append(f"Suma: {entry['scores']['suma_total']}")
+                            stats_parts.append(f"Score: {entry['scores']['score_promedio']:.3f}")
+                            stats_parts.append(f"Pares: {entry['scores']['pares']}/6")
+                        stats_texto = " &nbsp;|&nbsp; ".join(stats_parts)
+                        
+                        st.markdown(
+                            f"<div style='display: flex; align-items: center; gap: 20px; padding: 5px 0; "
+                            f"border-bottom: 1px solid rgba(200,200,200,0.3);'>"
+                            f"<div style='min-width: 160px; font-weight: 600; color: #F2A100; font-size: 0.85rem;'>{entry['metodo']}</div>"
+                            f"<div style='font-size: 0.95rem; min-width: 220px;'>{numeros_texto}</div>"
+                            f"<div style='color: #888; font-size: 0.82rem;'>{stats_texto}</div>"
+                            f"</div>",
+                            unsafe_allow_html=True
+                        )
             
             # Botón para limpiar historial
             if st.button("Limpiar Historial", type="secondary"):
