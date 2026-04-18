@@ -52,6 +52,12 @@ st.set_page_config(
 # CSS personalizado - Estilo Midasmind
 st.markdown("""
 <style>
+    /* Ocultar botones +/- de todos los number_input */
+    button[data-testid="stNumberInputStepUp"],
+    button[data-testid="stNumberInputStepDown"] {
+        display: none !important;
+    }
+
     /* Forzar tema claro en toda la aplicación */
     .stApp {
         background-color: #F9F9F9;
@@ -1622,10 +1628,10 @@ def crear_grafico_tendencias(freq_analyzer):
         plot_bgcolor='white',
         paper_bgcolor='white',
         font=dict(color='#333333'),
-        height=380,
+        height=800,
         title_font=dict(size=16, color='#333333'),
         xaxis=dict(showgrid=True, gridcolor='#f0f0f0'),
-        yaxis=dict(showgrid=False)
+        yaxis=dict(showgrid=False, dtick=1)
     )
     
     return fig
@@ -2384,13 +2390,16 @@ def main():
                     
                     # Resumen para copiar
                     # Preparar texto para copiar
+                    opt_suffix = " (Opt)" if usar_optimizer else ""
                     if metodo == GenerationStrategy.BOTH:
                         nums_std = ', '.join([f"{int(n):02d}" for n in result['standard']['combination']])
                         nums_cond = ', '.join([f"{int(n):02d}" for n in result['conditional']['combination']])
                         nums_rapido = ', '.join([f"{int(n):02d}" for n in prediccion_rapida['numeros']])
-                        texto_copiar = f"Estándar: {nums_std}\nCondicional: {nums_cond}\nRápido: {nums_rapido}"
+                        texto_copiar = f"Estándar{opt_suffix}: {nums_std}\nCondicional{opt_suffix}: {nums_cond}\nRápido: {nums_rapido}"
                     else:
                         texto_copiar = ', '.join([f"{int(n):02d}" for n in result['combination']])
+                        if usar_optimizer:
+                            texto_copiar = f"(Opt) {texto_copiar}"
                     
                     st.code(texto_copiar, language=None)
     
@@ -3009,20 +3018,31 @@ def main():
         with col_premio:
             st.markdown('<p style="margin-bottom: 0rem;">Premio</p>', unsafe_allow_html=True)
             
-            # Formatear valor actual con puntos de miles
-            valor_formateado = f"{int(st.session_state.premio_inv):,}".replace(',', '.')
+            # Callback para formatear con puntos de miles al cambiar
+            def formatear_premio():
+                raw = st.session_state.premio_input.replace('.', '').replace(',', '.')
+                try:
+                    numero = int(float(raw))
+                    st.session_state.premio_inv = float(numero)
+                    st.session_state.premio_input = f"{numero:,}".replace(',', '.')
+                except:
+                    pass
+            
+            # Inicializar valor formateado si no existe en session_state
+            if 'premio_input' not in st.session_state:
+                st.session_state.premio_input = f"{int(st.session_state.premio_inv):,}".replace(',', '.')
             
             # Input de texto con formato
-            premio_texto = st.text_input(
+            st.text_input(
                 "Premio",
-                value=valor_formateado,
                 label_visibility="collapsed",
-                key="premio_input"
+                key="premio_input",
+                on_change=formatear_premio
             )
             
-            # Convertir texto a número (removiendo puntos)
+            # Leer valor numérico actual
             try:
-                premio = float(premio_texto.replace('.', '').replace(',', '.'))
+                premio = float(st.session_state.premio_input.replace('.', '').replace(',', '.'))
                 st.session_state.premio_inv = premio
             except:
                 premio = st.session_state.premio_inv
@@ -3035,14 +3055,16 @@ def main():
             st.markdown(f"<div style='padding: 8px 12px; background-color: #f0f2f6; border-radius: 4px; text-align: center; font-size: 16px;'>{base_formateado}</div>", unsafe_allow_html=True)
         
         with col_tna:
-            tna_percent = st.number_input(
+            tna_texto = st.text_input(
                 "TNA (%)",
-                value=27.0,
-                min_value=0.0,
-                max_value=100.0,
-                step=0.5,
-                format="%.2f"
+                value="27.00",
+                key="tna_input"
             )
+            try:
+                tna_percent = float(tna_texto.replace(',', '.'))
+                tna_percent = max(0.0, min(100.0, tna_percent))
+            except:
+                tna_percent = 27.0
             tna = tna_percent / 100
         
         with col_meses:
@@ -3290,20 +3312,31 @@ def main():
         with col1:
             st.markdown('<p style="margin-bottom: 0rem;">Premio</p>', unsafe_allow_html=True)
             
-            # Formatear valor actual con puntos de miles
-            valor_premio_formateado = f"{int(st.session_state.premio_portfolio):,}".replace(',', '.')
+            # Callback para formatear con puntos de miles al cambiar
+            def formatear_premio_portfolio():
+                raw = st.session_state.premio_portfolio_input.replace('.', '').replace(',', '.')
+                try:
+                    numero = int(float(raw))
+                    st.session_state.premio_portfolio = float(numero)
+                    st.session_state.premio_portfolio_input = f"{numero:,}".replace(',', '.')
+                except:
+                    pass
+            
+            # Inicializar valor formateado si no existe en session_state
+            if 'premio_portfolio_input' not in st.session_state:
+                st.session_state.premio_portfolio_input = f"{int(st.session_state.premio_portfolio):,}".replace(',', '.')
             
             # Input de texto con formato
-            premio_portfolio_texto = st.text_input(
+            st.text_input(
                 "Premio",
-                value=valor_premio_formateado,
                 label_visibility="collapsed",
-                key="premio_portfolio_input"
+                key="premio_portfolio_input",
+                on_change=formatear_premio_portfolio
             )
             
-            # Convertir texto a número (removiendo puntos)
+            # Leer valor numérico actual
             try:
-                premio_portfolio = float(premio_portfolio_texto.replace('.', '').replace(',', '.'))
+                premio_portfolio = float(st.session_state.premio_portfolio_input.replace('.', '').replace(',', '.'))
                 st.session_state.premio_portfolio = premio_portfolio
             except:
                 premio_portfolio = st.session_state.premio_portfolio
