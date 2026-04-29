@@ -1,4 +1,4 @@
-"""
+﻿"""
 ================================================================================
   CHARLY PREDICTOR - INTERFAZ GRÁFICA WEB
   Sistema de Predicción de Quini 6
@@ -221,12 +221,6 @@ st.markdown("""
         box-shadow: 0 4px 12px rgba(242, 161, 0, 0.3);
     }
     
-    .stButton>button::after {
-        content: " ›";
-        margin-left: 8px;
-        font-size: 18px;
-    }
-    
     /* Headers - Estilo limpio Midasmind */
     h1 {
         color: #333333 !important;
@@ -359,12 +353,6 @@ st.markdown("""
         color: white;
         transform: translateY(-1px);
         box-shadow: 0 4px 12px rgba(242, 161, 0, 0.25);
-    }
-    
-    [data-testid="stSidebar"] .stButton>button::after {
-        content: " ›";
-        margin-left: 8px;
-        font-size: 16px;
     }
     
     /* Sidebar - Radio buttons estilo limpio */
@@ -1336,10 +1324,10 @@ def mostrar_analisis_regresion_equilibrio(regression_analyzer):
     hay_desequilibrios = any(deseq.values())
     
     if not hay_desequilibrios:
-        st.info("✓ No se detectaron desequilibrios significativos. Sistema en equilibrio normal.")
+        st.info("âœ“ No se detectaron desequilibrios significativos. Sistema en equilibrio normal.")
         return
     
-    st.warning("⚠️ Desequilibrios detectados - Sistema aplicará correcciones automáticas")
+    st.warning("âš ï¸ Desequilibrios detectados - Sistema aplicará correcciones automáticas")
     
     corr = summary['correcciones_aplicar']
     metricas = summary['metricas']
@@ -1354,24 +1342,24 @@ def mostrar_analisis_regresion_equilibrio(regression_analyzer):
             st.markdown("Pares/Impares")
             st.markdown(f"Desbalance: {desbalance_pct:.1f}%")
             if corr['paridad']:
-                st.markdown(f"→ {corr['paridad'].replace('_', ' ').title()}")
+                st.markdown(f"â†’ {corr['paridad'].replace('_', ' ').title()}")
         else:
             st.markdown("Pares/Impares")
-            st.markdown("✓ En equilibrio")
+            st.markdown("âœ“ En equilibrio")
     
     # Suma
     with cols[1]:
         if deseq['suma']:
             z_score = metricas['z_score_suma']
             st.markdown("Suma Total")
-            st.markdown(f"Z-Score: {z_score:+.2f}σ")
+            st.markdown(f"Z-Score: {z_score:+.2f}Ïƒ")
             if corr['suma']:
-                st.markdown(f"→ {corr['suma'].replace('_', ' ').title()}")
+                st.markdown(f"â†’ {corr['suma'].replace('_', ' ').title()}")
                 if metricas['suma_objetivo']:
                     st.markdown(f"Objetivo: ~{metricas['suma_objetivo']:.0f}")
         else:
             st.markdown("Suma Total")
-            st.markdown("✓ En equilibrio")
+            st.markdown("âœ“ En equilibrio")
     
     # Rangos
     with cols[2]:
@@ -1382,7 +1370,7 @@ def mostrar_analisis_regresion_equilibrio(regression_analyzer):
                 st.markdown(f"{rango_nombre}: {accion}")
         else:
             st.markdown("Rangos")
-            st.markdown("✓ En equilibrio")
+            st.markdown("âœ“ En equilibrio")
 
 
 def mostrar_analisis_resonancia_ciclos(cycle_resonance_analyzer):
@@ -1424,7 +1412,7 @@ def mostrar_analisis_resonancia_ciclos(cycle_resonance_analyzer):
     with st.expander("Ver Top 10 por Resonancia"):
         top = summary['top_resonancia']
         for i, (num, score, z) in enumerate(top, 1):
-            st.markdown(f"{i}. **Número {num}** - Score: {score:.2f} (Z: {z:+.2f}σ)")
+            st.markdown(f"{i}. **Número {num}** - Score: {score:.2f} (Z: {z:+.2f}Ïƒ)")
 
 
 def mostrar_analisis_multi_timeframe(multi_timeframe_analyzer):
@@ -1670,9 +1658,9 @@ def mostrar_portfolio(portfolio, freq_analyzer, portfolio_gen, metodo_nombre):
         for num in numeros:
             mom = momentum_results.get(num, 0)
             if mom > 0.3:
-                indicador = "↑"
+                indicador = "â†‘"
             elif mom < -0.3:
-                indicador = "↓"
+                indicador = "â†“"
             else:
                 indicador = ""
             
@@ -1831,7 +1819,7 @@ def main():
         
         # Banner informativo de configuración optimizada
         # st.info("""
-        # ✨ **Configuración Optimizada Activa** | Rendimiento: 2.25 aciertos/sorteo promedio  
+        # âœ¨ **Configuración Optimizada Activa** | Rendimiento: 2.25 aciertos/sorteo promedio  
         # Los parámetros predeterminados han sido optimizados mediante 130+ pruebas de configuración.
         # """)
         
@@ -2019,7 +2007,7 @@ def main():
             peso_latencia = st.slider(
                 "Latencia",
                 0.0, 1.0, OPTIMAL_WEIGHTS['peso_latencia'], 0.05,
-                help="⚠️ Optimización: Latencia en 0.00 mejora el rendimiento"
+                help="âš ï¸ Optimización: Latencia en 0.00 mejora el rendimiento"
             )
             
             peso_tendencia = st.slider(
@@ -2581,9 +2569,9 @@ def main():
         if verificar:
             # Validar que no haya números repetidos
             if len(set(numeros_ingresados)) != 6:
-                st.error("⚠️ No puedes repetir números. Cada número debe ser único.")
+                st.error("âš ï¸ No puedes repetir números. Cada número debe ser único.")
             elif 0 in numeros_ingresados:
-                st.warning("⚠️ Por favor completa los 6 números (no pueden ser 0).")
+                st.warning("âš ï¸ Por favor completa los 6 números (no pueden ser 0).")
             else:
                 # Realizar control
                 data = st.session_state.current_data
@@ -2592,7 +2580,7 @@ def main():
                 if resultados:
                     fecha_formateada = pd.Timestamp(resultados[0]['fecha']).strftime('%d/%m/%Y')
                     dia_semana = "Miércoles" if pd.Timestamp(resultados[0]['fecha']).dayofweek == 2 else "Domingo"
-                    st.success(f"✅ Controlando contra los sorteos del {dia_semana} {fecha_formateada}")
+                    st.success(f"âœ… Controlando contra los sorteos del {dia_semana} {fecha_formateada}")
                     
                     # Mostrar resultados en 4 tarjetas (2x2)
                     st.markdown("---")
@@ -2637,15 +2625,15 @@ def main():
                                     # Mensaje según aciertos
                                     if resultado['aciertos'] >= 4:
                                         if resultado['aciertos'] == 6:
-                                            st.success("🎉 ¡FELICITACIONES! ¡Ganaste el premio mayor!")
+                                            st.success("ðŸŽ‰ Â¡FELICITACIONES! Â¡Ganaste el premio mayor!")
                                         elif resultado['aciertos'] == 5:
-                                            st.success("🎊 ¡Excelente! ¡5 aciertos! ¡Premio importante!")
+                                            st.success("ðŸŽŠ Â¡Excelente! Â¡5 aciertos! Â¡Premio importante!")
                                         else:
-                                            st.info("👏 ¡Bien hecho! Tienes premio.")
+                                            st.info("ðŸ‘ Â¡Bien hecho! Tienes premio.")
                                     else:
                                         st.warning(f"No tienes premio. El mínimo para ganar en {resultado['modalidad']} son 4 aciertos.")
                 else:
-                    st.error("❌ No se pudieron obtener los resultados. Verifica que haya datos cargados.")
+                    st.error("âŒ No se pudieron obtener los resultados. Verifica que haya datos cargados.")
     
     # ========================================================================
     # TAB 3: ANÁLISIS
@@ -2805,9 +2793,9 @@ def main():
                 ideas_activas.append("IDEA #2 (Multi-Timeframe)")
             
             if ideas_activas:
-                st.info(f"✓ Se usarán: {', '.join(ideas_activas)}")
+                st.info(f"âœ“ Se usarán: {', '.join(ideas_activas)}")
             else:
-                st.warning("⚠️ Ninguna IDEA activada en Parámetros → Avanzados")
+                st.warning("âš ï¸ Ninguna IDEA activada en Parámetros â†’ Avanzados")
         
         if st.button("Ejecutar Validación Walk-Forward", type="primary"):
             try:
@@ -2841,7 +2829,7 @@ def main():
                     
                     # Mostrar resultados
                     if usar_ideas_walkforward and ideas_activas:
-                        st.success(f"✓ Validación completada con {', '.join(ideas_activas)}")
+                        st.success(f"âœ“ Validación completada con {', '.join(ideas_activas)}")
                     else:
                         st.success("Validación completada (sistema base)")
                     
@@ -2929,7 +2917,7 @@ def main():
         st.markdown("## Historial de Predicciones")
         
         if len(st.session_state.historial) == 0:
-            st.info("No hay predicciones en el historial todavía. ¡Genera tu primera predicción!")
+            st.info("No hay predicciones en el historial todavía. Â¡Genera tu primera predicción!")
         else:
             # Agrupar predicciones por timestamp (misma fecha/hora = misma sesión)
             from collections import OrderedDict
@@ -3397,7 +3385,7 @@ def main():
         # Validar que la suma de porcentajes sea 100%
         suma_pct = pct_pf + pct_cer + pct_usd
         if abs(suma_pct - 100.0) > 0.1:
-            st.warning(f"⚠️ La suma de porcentajes debe ser 100% (actual: {suma_pct:.1f}%)")
+            st.warning(f"âš ï¸ La suma de porcentajes debe ser 100% (actual: {suma_pct:.1f}%)")
         
         # Limpiar gastos de meses que exceden el nuevo límite
         if st.session_state.gastos_portfolio:
@@ -3660,4 +3648,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 

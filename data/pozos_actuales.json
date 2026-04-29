@@ -1,18 +1,18 @@
 {
   "Tradicional": {
-    "premio": "2336425276",
-    "ganadores": "1"
-  },
-  "Segunda": {
     "premio": "780000000",
     "ganadores": "Pozo Vacante"
   },
+  "Segunda": {
+    "premio": "965697295",
+    "ganadores": "1"
+  },
   "Revancha": {
-    "premio": "1942774470",
+    "premio": "3210639444",
     "ganadores": "Pozo Vacante"
   },
   "SiempreSale": {
-    "premio": "24070749",
-    "ganadores": "12"
+    "premio": "20953876",
+    "ganadores": "18"
   }
 }
