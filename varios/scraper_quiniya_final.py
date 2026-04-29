@@ -267,8 +267,16 @@ def _leer_existentes_csv(archivo):
 
 def actualizar_historico_csv(archivo='data/quini6_historico.csv'):
     """
-    Actualiza el CSV agregando solo sorteos faltantes (sin pisar datos)
+    Actualiza el CSV de Quini6 desde QuiniYa.com.ar agregando solo sorteos faltantes.
+    SOLO puede escribir en CSVs cuyo nombre contenga 'quini' para evitar cruce con Loto.
     """
+    archivo_norm = str(archivo).replace('\\', '/').lower()
+    if 'quini' not in archivo_norm:
+        raise ValueError(
+            f"Ruta destino inválida para scraper de Quini6: '{archivo}'.\n"
+            f"Este scraper extrae datos de QuiniYa.com.ar (Quini 6) y solo puede "
+            f"escribir en el CSV de Quini 6 (la ruta debe contener 'quini')."
+        )
     driver = configurar_driver()
     
     try:

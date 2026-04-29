@@ -1,0 +1,21 @@
+{
+  "Tradicional": {
+    "premio": "1347569907",
+    "ganadores": "Vacante"
+  },
+  "Match": {
+    "premio": "8275389313",
+    "ganadores": "Vacante"
+  },
+  "Desquite": {
+    "premio": "495528774",
+    "ganadores": "Vacante"
+  },
+  "SaleOSale": {
+    "premio": "45581454",
+    "ganadores": "6"
+  },
+  "Plus": {
+    "vacante": true
+  }
+}
