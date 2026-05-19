@@ -1279,6 +1279,113 @@ def controlar_boleta(numeros_jugados, data, fecha_seleccionada=None, juego='quin
     return resultados
 
 
+@st.cache_data
+def cargar_resultados_reales_historial(juego='quini6'):
+    """Carga sorteos reales desde CSV para evaluar aciertos del historial."""
+    config_juego = obtener_config_juego(juego)
+    csv_path = config_juego['csv_path']
+
+    df = pd.read_csv(csv_path)
+    if df.empty:
+        return pd.DataFrame(columns=['fecha', 'modalidad', 'numeros_real', 'numero_plus_real'])
+
+    df['fecha'] = pd.to_datetime(df['fecha']).dt.date
+
+    if 'sorteo_id' not in df.columns:
+        df['sorteo_id'] = range(1, len(df) + 1)
+
+    df = df.sort_values(['fecha', 'sorteo_id']).reset_index(drop=True)
+
+    num_cols = ['num1', 'num2', 'num3', 'num4', 'num5', 'num6']
+    df['numeros_real'] = df.apply(
+        lambda row: sorted([int(row[c]) for c in num_cols]),
+        axis=1
+    )
+
+    if juego == 'quini6':
+        modalidades = config_juego.get('modalidades', ['Tradicional', 'Segunda', 'Revancha', 'Siempre Sale'])
+        df['modalidad_idx'] = df.groupby('fecha').cumcount()
+        df['modalidad'] = df['modalidad_idx'].apply(
+            lambda idx: modalidades[idx] if idx < len(modalidades) else f"Sorteo {idx + 1}"
+        )
+        df['numero_plus_real'] = pd.NA
+    else:
+        if 'modalidad' not in df.columns:
+            modalidades = config_juego.get('modalidades', ['Loto Tradicional', 'Loto Match', 'Loto Desquite', 'Loto Sale o Sale'])
+            df['modalidad_idx'] = df.groupby('fecha').cumcount()
+            df['modalidad'] = df['modalidad_idx'].apply(
+                lambda idx: modalidades[idx] if idx < len(modalidades) else f"Sorteo {idx + 1}"
+            )
+        if 'numero_plus' in df.columns:
+            df['numero_plus_real'] = pd.to_numeric(df['numero_plus'], errors='coerce')
+        else:
+            df['numero_plus_real'] = pd.NA
+
+    return df[['fecha', 'modalidad', 'numeros_real', 'numero_plus_real']].copy()
+
+
+def inferir_juego_historial(juego_nombre):
+    """Mapea nombre del juego guardado en historial a clave interna."""
+    nombre = str(juego_nombre).strip().lower()
+    if 'loto' in nombre:
+        return 'loto'
+    return 'quini6'
+
+
+def evaluar_entry_historial_con_real(entry, df_real):
+    """Evalúa una predicción del historial contra todos los sorteos de la primera fecha disponible."""
+    if df_real is None or df_real.empty:
+        return None
+
+    prediccion = entry.get('prediccion')
+    if not isinstance(prediccion, list) or len(prediccion) != 6:
+        return None
+
+    try:
+        fecha_pred = datetime.strptime(entry.get('timestamp', ''), "%Y-%m-%d %H:%M:%S").date()
+    except Exception:
+        return None
+
+    candidatos = df_real[df_real['fecha'] >= fecha_pred]
+    if candidatos.empty:
+        return {
+            'estado': 'pendiente'
+        }
+
+    fecha_objetivo = candidatos['fecha'].min()
+    sorteos_fecha = candidatos[candidatos['fecha'] == fecha_objetivo]
+
+    pred_set = set(int(n) for n in prediccion)
+    resultados_modalidad = []
+    for _, row in sorteos_fecha.iterrows():
+        numeros_real = row['numeros_real']
+        aciertos = len(pred_set & set(numeros_real))
+        resultados_modalidad.append({
+            'modalidad': str(row['modalidad']),
+            'aciertos': int(aciertos)
+        })
+
+    if not resultados_modalidad:
+        return None
+
+    resultado = {
+        'estado': 'ok',
+        'fecha_real': str(fecha_objetivo),
+        'resultados_modalidad': resultados_modalidad,
+    }
+
+    plus_pred = entry.get('numero_plus')
+    plus_real = sorteos_fecha['numero_plus_real'].iloc[0] if 'numero_plus_real' in sorteos_fecha.columns and len(sorteos_fecha) > 0 else pd.NA
+    if plus_pred is not None and pd.notna(plus_real):
+        resultado['plus_disponible'] = True
+        resultado['acierto_plus'] = int(int(plus_pred) == int(plus_real))
+        resultado['plus_real'] = int(plus_real)
+    else:
+        resultado['plus_disponible'] = False
+
+    return resultado
+
+
 def mostrar_bolillas(numeros_sorteo, numeros_acertados):
     """
     Muestra números como bolillas/esferas con estilo QuiniYa
@@ -3182,6 +3289,13 @@ def main():
         if len(st.session_state.historial) == 0:
             st.info("No hay predicciones en el historial todavía. Â¡Genera tu primera predicción!")
         else:
+            resultados_reales_cache = {}
+            for juego_key in GAME_CONFIGS.keys():
+                try:
+                    resultados_reales_cache[juego_key] = cargar_resultados_reales_historial(juego_key)
+                except Exception:
+                    resultados_reales_cache[juego_key] = None
+
             # Agrupar predicciones por timestamp (misma fecha/hora = misma sesión)
             from collections import OrderedDict
             grupos_historial = OrderedDict()
@@ -3199,10 +3313,66 @@ def main():
                 with st.expander(label):
                     for entry in entries:
                         juego_entry = entry.get('juego', 'Quini 6')
+                        juego_key = inferir_juego_historial(juego_entry)
                         numeros_texto = ', '.join([f"{n:02d}" for n in entry['prediccion']])
                         plus_entry = entry.get('numero_plus')
                         if plus_entry is not None:
                             numeros_texto += f" &nbsp;+&nbsp; <span style='color:#F2A100;font-weight:700;'>Plus: {plus_entry}</span>"
+
+                        evaluacion = evaluar_entry_historial_con_real(
+                            entry,
+                            resultados_reales_cache.get(juego_key)
+                        )
+
+                        if evaluacion and evaluacion.get('estado') == 'ok':
+                            resultados_modalidad = evaluacion.get('resultados_modalidad', [])
+                            aciertos_map = {r['modalidad']: r['aciertos'] for r in resultados_modalidad}
+                            modalidades_juego = obtener_config_juego(juego_key).get('modalidades', [])
+                            modalidad_1 = modalidades_juego[0] if len(modalidades_juego) > 0 else 'Modalidad 1'
+                            modalidad_2 = modalidades_juego[1] if len(modalidades_juego) > 1 else 'Modalidad 2'
+                            modalidad_3 = modalidades_juego[2] if len(modalidades_juego) > 2 else 'Modalidad 3'
+                            modalidad_4 = modalidades_juego[3] if len(modalidades_juego) > 3 else 'Modalidad 4'
+
+                            valor_1 = f"{aciertos_map.get(modalidad_1, 0)}/6"
+                            valor_2 = f"{aciertos_map.get(modalidad_2, 0)}/6"
+                            valor_3 = f"{aciertos_map.get(modalidad_3, 0)}/6"
+                            valor_4 = f"{aciertos_map.get(modalidad_4, 0)}/6"
+                            total_aciertos = sum(r['aciertos'] for r in resultados_modalidad)
+
+                            plus_texto = '-'
+                            if evaluacion.get('plus_disponible'):
+                                plus_texto = f"{evaluacion.get('acierto_plus', 0)}/1"
+
+                            tabla_compacta_html = (
+                                "<table style='border-collapse: collapse; width: 100%; font-size: 0.80rem;'>"
+                                "<thead>"
+                                "<tr style='background: #f5f5f5;'>"
+                                "<th style='text-align:left; padding: 4px 6px; border: 1px solid #e6e6e6;'>Fecha</th>"
+                                "<th style='text-align:left; padding: 4px 6px; border: 1px solid #e6e6e6;'>Trad</th>"
+                                "<th style='text-align:left; padding: 4px 6px; border: 1px solid #e6e6e6;'>Seg/Match</th>"
+                                "<th style='text-align:left; padding: 4px 6px; border: 1px solid #e6e6e6;'>Rev/Desq</th>"
+                                "<th style='text-align:left; padding: 4px 6px; border: 1px solid #e6e6e6;'>SS/Sale</th>"
+                                "<th style='text-align:left; padding: 4px 6px; border: 1px solid #e6e6e6;'>Plus</th>"
+                                "<th style='text-align:left; padding: 4px 6px; border: 1px solid #e6e6e6;'>Total</th>"
+                                "</tr>"
+                                "</thead>"
+                                "<tbody>"
+                                f"<tr>"
+                                f"<td style='padding: 4px 6px; border: 1px solid #e6e6e6;'>{evaluacion['fecha_real']}</td>"
+                                f"<td style='padding: 4px 6px; border: 1px solid #e6e6e6;' title='{modalidad_1}'>{valor_1}</td>"
+                                f"<td style='padding: 4px 6px; border: 1px solid #e6e6e6;' title='{modalidad_2}'>{valor_2}</td>"
+                                f"<td style='padding: 4px 6px; border: 1px solid #e6e6e6;' title='{modalidad_3}'>{valor_3}</td>"
+                                f"<td style='padding: 4px 6px; border: 1px solid #e6e6e6;' title='{modalidad_4}'>{valor_4}</td>"
+                                f"<td style='padding: 4px 6px; border: 1px solid #e6e6e6;'>{plus_texto}</td>"
+                                f"<td style='padding: 4px 6px; border: 1px solid #e6e6e6; font-weight: 700;'>{total_aciertos}/24</td>"
+                                f"</tr>"
+                                "</tbody>"
+                                "</table>"
+                            )
+                        elif evaluacion and evaluacion.get('estado') == 'pendiente':
+                            tabla_compacta_html = "<div style='color:#888; font-size:0.82rem;'>Aciertos: pendiente de sorteo real</div>"
+                        else:
+                            tabla_compacta_html = "<div style='color:#888; font-size:0.82rem;'>Aciertos: sin datos para evaluar</div>"
                         
                         # Construir stats inline
                         stats_parts = []
@@ -3218,6 +3388,9 @@ def main():
                             f"<div style='min-width: 220px; font-weight: 600; color: #F2A100; font-size: 0.85rem;'>{juego_entry} - {entry['metodo']}</div>"
                             f"<div style='font-size: 0.95rem; min-width: 220px;'>{numeros_texto}</div>"
                             f"<div style='color: #888; font-size: 0.82rem;'>{stats_texto}</div>"
+                            f"</div>"
+                            f"<div style='padding: 2px 0 8px 0; margin-left: 0px;'>"
+                            f"{tabla_compacta_html}"
                             f"</div>",
                             unsafe_allow_html=True
                         )
