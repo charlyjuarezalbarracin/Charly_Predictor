@@ -6,6 +6,7 @@
 """
 
 import streamlit as st
+import streamlit.components.v1 as components
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
@@ -1868,6 +1869,106 @@ def mostrar_numeros_predichos(numeros, titulo="Predicción"):
     )
 
 
+def mostrar_bloque_copiable(texto, key_base="pred"):
+    """Muestra texto con el botón nativo de copiar de Streamlit."""
+    st.code(texto, language=None)
+
+
+def aplicar_fallback_copiado_nativo():
+    """Parchea el botón nativo de copiar de st.code con fallback execCommand."""
+    components.html(
+        """
+        <script>
+        (function () {
+            let doc = document;
+            try {
+                if (window.parent && window.parent.document) {
+                    doc = window.parent.document;
+                }
+            } catch (e) {
+                doc = document;
+            }
+
+            if (doc.__charlyCopyPatched) {
+                return;
+            }
+            doc.__charlyCopyPatched = true;
+
+            async function fallbackCopy(texto) {
+                try {
+                    const navParent = (window.parent && window.parent.navigator) ? window.parent.navigator : null;
+                    if (navParent && navParent.clipboard) {
+                        await navParent.clipboard.writeText(texto);
+                        return true;
+                    }
+                } catch (e) {}
+
+                try {
+                    if (navigator.clipboard && window.isSecureContext) {
+                        await navigator.clipboard.writeText(texto);
+                        return true;
+                    }
+                } catch (e) {}
+
+                try {
+                    const area = doc.createElement("textarea");
+                    area.value = texto;
+                    area.setAttribute("readonly", "");
+                    area.style.position = "fixed";
+                    area.style.left = "-9999px";
+                    doc.body.appendChild(area);
+                    area.focus();
+                    area.select();
+                    area.setSelectionRange(0, area.value.length);
+                    const ok = doc.execCommand("copy");
+                    doc.body.removeChild(area);
+                    return ok;
+                } catch (e) {
+                    return false;
+                }
+            }
+
+            function encontrarContenedorConCode(inicio) {
+                let el = inicio;
+                for (let i = 0; i < 10 && el; i++) {
+                    if (el.querySelector && el.querySelector("code")) {
+                        return el;
+                    }
+                    el = el.parentElement;
+                }
+                return null;
+            }
+
+            async function manejarEventoCopia(ev) {
+                const btn = ev.target.closest("button");
+                if (!btn) return;
+
+                const aria = (btn.getAttribute("aria-label") || "").toLowerCase();
+                const testid = (btn.getAttribute("data-testid") || "").toLowerCase();
+                const isCopyBtn = aria.includes("copy to clipboard") || aria.includes("copiar") || testid.includes("copy");
+                if (!isCopyBtn) return;
+
+                const bloque = encontrarContenedorConCode(btn);
+                if (!bloque) return;
+
+                const nodoTexto = bloque.querySelector("pre code") || bloque.querySelector("code") || bloque.querySelector("pre");
+                if (!nodoTexto) return;
+
+                const texto = (nodoTexto.innerText || "").trim();
+                if (!texto) return;
+
+                await fallbackCopy(texto);
+            }
+
+            doc.addEventListener("pointerdown", manejarEventoCopia, true);
+            doc.addEventListener("click", manejarEventoCopia, true);
+        })();
+        </script>
+        """,
+        height=0,
+    )
+
+
 def mostrar_portfolio(portfolio, freq_analyzer, portfolio_gen, metodo_nombre, numero_plus=None):
     """Muestra un portfolio de combinaciones generadas"""
     st.markdown(f"### {len(portfolio)} Combinaciones Generadas")
@@ -1963,7 +2064,7 @@ def mostrar_portfolio(portfolio, freq_analyzer, portfolio_gen, metodo_nombre, nu
         texto_copiar_lines.append(f"#{idx} {combo_data['nombre']}: {nums_formatted}")
     
     texto_copiar = '\n'.join(texto_copiar_lines)
-    st.code(texto_copiar, language=None)
+    mostrar_bloque_copiable(texto_copiar, key_base="portfolio")
 
 
 # ============================================================================
@@ -1972,6 +2073,7 @@ def mostrar_portfolio(portfolio, freq_analyzer, portfolio_gen, metodo_nombre, nu
 
 def main():
     init_session_state()
+    aplicar_fallback_copiado_nativo()
     config_juego_actual = obtener_config_juego(st.session_state.juego_actual)
     
     # HEADER
@@ -2738,7 +2840,10 @@ def main():
                         # Actualizar texto_copiar para incluir plus
                         texto_copiar = texto_copiar + f"\nNumero plus: {_plus_loto}"
 
-                    st.code(texto_copiar, language=None)
+                    mostrar_bloque_copiable(
+                        texto_copiar,
+                        key_base=f"pred_{st.session_state.prediction_count}"
+                    )
     
     # ========================================================================
     # TAB 2: CONTROL BOLETA

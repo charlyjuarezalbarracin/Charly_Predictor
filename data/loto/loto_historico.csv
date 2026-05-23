@@ -1487,3 +1487,7 @@ sorteo_id,fecha,modalidad,num1,num2,num3,num4,num5,num6,numero_plus
 1486,2026-05-16,Loto Match,1,7,8,19,27,45,0
 1487,2026-05-16,Loto Desquite,6,8,18,28,43,44,0
 1488,2026-05-16,Loto Sale o Sale,5,11,18,20,21,42,0
+1489,2026-05-20,Loto Tradicional,1,17,19,29,32,38,7
+1490,2026-05-20,Loto Match,2,10,21,25,36,40,7
+1491,2026-05-20,Loto Desquite,6,13,21,24,41,42,7
+1492,2026-05-20,Loto Sale o Sale,19,20,34,35,40,42,7
