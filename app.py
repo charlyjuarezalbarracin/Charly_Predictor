@@ -1108,12 +1108,52 @@ def guardar_pozos_loto_json(pozos):
     except Exception as e:
         print(f"No se pudo guardar pozos Loto: {str(e)}")
 
+
+def _sanear_importes_pozos_loto(pozos):
+    """Corrige importes de Loto inflados x100 por parseo histórico de decimales XML."""
+    if not isinstance(pozos, dict):
+        return pozos, False
+
+    modalidades = ['Tradicional', 'Match', 'Desquite', 'SaleOSale']
+    premios = []
+    for mod in modalidades:
+        data = pozos.get(mod)
+        if not isinstance(data, dict):
+            continue
+        premio = data.get('premio')
+        try:
+            premios.append((mod, int(premio)))
+        except Exception:
+            continue
+
+    if len(premios) < 3:
+        return pozos, False
+
+    # Patrón observado del bug: varios pozos quedan x100 (dos decimales anexados).
+    # Señal robusta: al menos 2 modalidades por encima de 10 mil millones.
+    altos = sum(1 for _, v in premios if v >= 10_000_000_000)
+    if altos < 2:
+        return pozos, False
+
+    pozos_fix = dict(pozos)
+    for mod, valor in premios:
+        data = dict(pozos_fix.get(mod, {}))
+        data['premio'] = str(valor // 100)
+        pozos_fix[mod] = data
+
+    return pozos_fix, True
+
 def cargar_pozos_loto_json():
     """Cargar pozos de Loto desde archivo JSON (separado de Quini6)"""
     try:
         if POZOS_LOTO_FILE.exists():
             with open(POZOS_LOTO_FILE, 'r', encoding='utf-8') as f:
-                return json.load(f)
+                pozos = json.load(f)
+
+            pozos_saneados, cambiado = _sanear_importes_pozos_loto(pozos)
+            if cambiado:
+                guardar_pozos_loto_json(pozos_saneados)
+            return pozos_saneados
         return None
     except Exception as e:
         print(f"No se pudo cargar pozos Loto: {str(e)}")
@@ -1175,6 +1215,12 @@ def formatear_pozo(data):
         if premio:
             try:
                 numero = int(premio)
+
+                # Salvaguarda para Loto: algunas versiones previas guardaron
+                # montos del XML inflados x100 al concatenar decimales.
+                if st.session_state.get('juego_actual') == 'loto' and numero >= 100_000_000_000:
+                    numero = numero // 100
+
                 premio_formateado = f"{numero:,}".replace(',', '.')
                 
                 # Formatear ganadores: si es un número, agregar "Ganadores"
@@ -1299,7 +1345,7 @@ def cargar_resultados_reales_historial(juego='quini6'):
 
     num_cols = ['num1', 'num2', 'num3', 'num4', 'num5', 'num6']
     df['numeros_real'] = df.apply(
-        lambda row: sorted([int(row[c]) for c in num_cols]),
+        lambda row: tuple(sorted([int(row[c]) for c in num_cols])),
         axis=1
     )
 
@@ -1360,10 +1406,12 @@ def evaluar_entry_historial_con_real(entry, df_real):
     resultados_modalidad = []
     for _, row in sorteos_fecha.iterrows():
         numeros_real = row['numeros_real']
-        aciertos = len(pred_set & set(numeros_real))
+        coincidencias = sorted(pred_set & set(numeros_real))
+        aciertos = len(coincidencias)
         resultados_modalidad.append({
             'modalidad': str(row['modalidad']),
-            'aciertos': int(aciertos)
+            'aciertos': int(aciertos),
+            'coincidencias': [int(n) for n in coincidencias]
         })
 
     if not resultados_modalidad:
@@ -2063,7 +2111,8 @@ def mostrar_portfolio(portfolio, freq_analyzer, portfolio_gen, metodo_nombre, nu
         nums_formatted = ', '.join([f"{int(n):02d}" for n in combo_data['numeros']])
         texto_copiar_lines.append(f"#{idx} {combo_data['nombre']}: {nums_formatted}")
     
-    texto_copiar = '\n'.join(texto_copiar_lines)
+    nombre_juego_copiar = "Loto" if st.session_state.juego_actual == 'loto' else "Quini6"
+    texto_copiar = f"{nombre_juego_copiar}:\n" + '\n'.join(texto_copiar_lines)
     mostrar_bloque_copiable(texto_copiar, key_base="portfolio")
 
 
@@ -2138,16 +2187,66 @@ def main():
             match_info = match_info or '-'
             desq_info  = desq_info  or '-'
             sale_info  = sale_info  or '-'
-            # Plus: mostrar estado (Vacante / acertado)
-            plus_data = pozos.get('Plus', {})
-            plus_estado = ''
-            if plus_data.get('vacante') is True:
-                plus_estado = ' &nbsp;|&nbsp; <span style="color:#F2A100;font-size:0.78rem;">Plus: Vacante</span>'
-            elif plus_data.get('vacante') is False:
-                plus_estado = ' &nbsp;|&nbsp; <span style="color:#888;font-size:0.78rem;">Plus: acertado</span>'
+
+            # Resultados del ultimo sorteo desde XML (si existen).
+            resultados = pozos.get('Resultados', {})
+            meta = pozos.get('Meta', {})
+
+            def _fmt_nums(nums):
+                if not isinstance(nums, list) or len(nums) != 6:
+                    return None
+                try:
+                    return '-'.join([f"{int(n):02d}" for n in nums])
+                except Exception:
+                    return None
+
+            lineas_resultados = []
+            trad_nums = _fmt_nums(resultados.get('Tradicional'))
+            match_nums = _fmt_nums(resultados.get('Match'))
+            desq_nums = _fmt_nums(resultados.get('Desquite'))
+            sale_nums = _fmt_nums(resultados.get('SaleOSale'))
+            plus_num = resultados.get('Plus')
+
+            if trad_nums:
+                lineas_resultados.append(f"Tradicional {trad_nums}")
+            if match_nums:
+                lineas_resultados.append(f"Match {match_nums}")
+            if desq_nums:
+                lineas_resultados.append(f"Desquite {desq_nums}")
+            if sale_nums:
+                lineas_resultados.append(f"Sale o Sale {sale_nums}")
+            if plus_num is not None:
+                try:
+                    lineas_resultados.append(f"Numero plus {int(plus_num):02d}")
+                except Exception:
+                    lineas_resultados.append(f"Numero plus {plus_num}")
+
+            fecha_meta = meta.get('fecha')
+            if isinstance(fecha_meta, str) and len(fecha_meta) == 10 and '-' in fecha_meta:
+                try:
+                    yyyy, mm, dd = fecha_meta.split('-')
+                    fecha_meta = f"{dd}/{mm}/{yyyy}"
+                except Exception:
+                    pass
+            sorteo_meta = meta.get('sorteo')
+
+            detalle_sorteo = ''
+            if sorteo_meta or fecha_meta:
+                sorteo_txt = f"Sorteo {sorteo_meta}" if sorteo_meta else ''
+                fecha_txt = f"Fecha {fecha_meta}" if fecha_meta else ''
+                separador = ' | ' if sorteo_txt and fecha_txt else ''
+                detalle_sorteo = f"{sorteo_txt}{separador}{fecha_txt}"
+
+            bloque_resultados = ''
+            if detalle_sorteo or lineas_resultados:
+                resultados_txt = ' | '.join(lineas_resultados)
+                detalle_html = f'<div style="margin-top:0.2rem;color:#999;font-size:0.78rem;">{detalle_sorteo}</div>' if detalle_sorteo else ''
+                resultados_html = f'<div style="margin-top:0.2rem;color:#ddd;font-size:0.76rem;line-height:1.35;">{resultados_txt}</div>' if resultados_txt else ''
+                bloque_resultados = f'{detalle_html}{resultados_html}'
+
             st.markdown(f"""
             <div class="pozos-container">
-                <div class="pozos-title">Pozos Actuales{plus_estado}</div>
+                <div class="pozos-title">Pozos Actuales</div>
                 <div class="pozos-grid">
                     <div class="pozo-card">
                         <div class="pozo-modalidad">Tradicional</div>
@@ -2170,6 +2269,8 @@ def main():
                         <div class="pozo-info">{sale_info}</div>
                     </div>
                 </div>
+                {bloque_resultados}
+                <div style="margin-top:0.2rem;color:#888;font-size:0.76rem;">Plus: Vacante</div>
             </div>
             """, unsafe_allow_html=True)
     
@@ -2625,7 +2726,7 @@ def main():
                 # NÚMERO PLUS para portfolio (solo Loto)
                 if st.session_state.juego_actual == 'loto':
                     st.markdown("---")
-                    st.markdown("### Número plus sugerido")
+                    st.markdown("### Número plus sugerido - Loto")
                     st.markdown(
                         f'<div style="display:flex;gap:12px;align-items:center;margin-bottom:0.5rem;">'
                         f'<div class="numero-predicho" style="background:#F2A100;color:#1a1a1a;font-weight:700;font-size:1.3rem;'
@@ -2814,20 +2915,37 @@ def main():
                     # Resumen para copiar
                     # Preparar texto para copiar
                     opt_suffix = " (Opt)" if usar_optimizer else ""
+
+                    if st.session_state.juego_actual == 'loto':
+                        lineas_pozos = [
+                            "Tradicional: $2.953.483.488",
+                            "Match: $821.384.114",
+                            "Desquite: $1.268.201.915",
+                        ]
+                    else:
+                        lineas_pozos = [
+                            "Tradicional: $5.060.737.231",
+                            "La Segunda: $2.346.625.033",
+                            "Revancha: $2.953.483.488",
+                        ]
+
+                    nombre_juego_copiar = "Loto" if st.session_state.juego_actual == 'loto' else "Quini6"
+
                     if metodo == GenerationStrategy.BOTH:
                         nums_std = ', '.join([f"{int(n):02d}" for n in result['standard']['combination']])
                         nums_cond = ', '.join([f"{int(n):02d}" for n in result['conditional']['combination']])
                         nums_rapido = ', '.join([f"{int(n):02d}" for n in prediccion_rapida['numeros']])
-                        texto_copiar = f"Estándar{opt_suffix}: {nums_std}\nCondicional{opt_suffix}: {nums_cond}\nRápido: {nums_rapido}"
+                        texto_copiar = f"{nombre_juego_copiar}:\nEstándar{opt_suffix}: {nums_std}\nCondicional{opt_suffix}: {nums_cond}\nRápido: {nums_rapido}\n\n" + "\n".join(lineas_pozos)
                     else:
                         texto_copiar = ', '.join([f"{int(n):02d}" for n in result['combination']])
                         if usar_optimizer:
                             texto_copiar = f"(Opt) {texto_copiar}"
+                        texto_copiar = f"{nombre_juego_copiar}:\n" + texto_copiar + "\n\n" + "\n".join(lineas_pozos)
                     
                     # NÚMERO PLUS (solo para Loto, siempre)
                     if st.session_state.juego_actual == 'loto':
                         st.markdown("---")
-                        st.markdown("### Número plus sugerido")
+                        st.markdown("### Número plus sugerido - Loto")
                         st.markdown(
                             f'<div style="display:flex;gap:12px;align-items:center;margin-bottom:0.5rem;">'
                             f'<div class="numero-predicho" style="background:#F2A100;color:#1a1a1a;font-weight:700;font-size:1.3rem;'
@@ -3390,12 +3508,17 @@ def main():
     
     with tab6:
         st.markdown("## Historial de Predicciones")
-        
-        if len(st.session_state.historial) == 0:
-            st.info("No hay predicciones en el historial todavía. Â¡Genera tu primera predicción!")
+
+        historial_filtrado = [
+            entry for entry in st.session_state.historial
+            if inferir_juego_historial(entry.get('juego', 'Quini 6')) == st.session_state.juego_actual
+        ]
+
+        if len(historial_filtrado) == 0:
+            st.info("No hay predicciones en el historial para este juego todavía.")
         else:
             resultados_reales_cache = {}
-            for juego_key in GAME_CONFIGS.keys():
+            for juego_key in [st.session_state.juego_actual]:
                 try:
                     resultados_reales_cache[juego_key] = cargar_resultados_reales_historial(juego_key)
                 except Exception:
@@ -3404,7 +3527,7 @@ def main():
             # Agrupar predicciones por timestamp (misma fecha/hora = misma sesión)
             from collections import OrderedDict
             grupos_historial = OrderedDict()
-            for i, entry in enumerate(st.session_state.historial):
+            for i, entry in enumerate(historial_filtrado):
                 ts = entry['timestamp']
                 if ts not in grupos_historial:
                     grupos_historial[ts] = []
@@ -3419,83 +3542,66 @@ def main():
                     for entry in entries:
                         juego_entry = entry.get('juego', 'Quini 6')
                         juego_key = inferir_juego_historial(juego_entry)
-                        numeros_texto = ', '.join([f"{n:02d}" for n in entry['prediccion']])
-                        plus_entry = entry.get('numero_plus')
-                        if plus_entry is not None:
-                            numeros_texto += f" &nbsp;+&nbsp; <span style='color:#F2A100;font-weight:700;'>Plus: {plus_entry}</span>"
 
                         evaluacion = evaluar_entry_historial_con_real(
                             entry,
                             resultados_reales_cache.get(juego_key)
                         )
 
+                        coincidencias_map = {}
                         if evaluacion and evaluacion.get('estado') == 'ok':
-                            resultados_modalidad = evaluacion.get('resultados_modalidad', [])
-                            aciertos_map = {r['modalidad']: r['aciertos'] for r in resultados_modalidad}
-                            modalidades_juego = obtener_config_juego(juego_key).get('modalidades', [])
-                            modalidad_1 = modalidades_juego[0] if len(modalidades_juego) > 0 else 'Modalidad 1'
-                            modalidad_2 = modalidades_juego[1] if len(modalidades_juego) > 1 else 'Modalidad 2'
-                            modalidad_3 = modalidades_juego[2] if len(modalidades_juego) > 2 else 'Modalidad 3'
-                            modalidad_4 = modalidades_juego[3] if len(modalidades_juego) > 3 else 'Modalidad 4'
+                            coincidencias_map = {
+                                r.get('modalidad', ''): set(r.get('coincidencias', []))
+                                for r in evaluacion.get('resultados_modalidad', [])
+                            }
 
-                            valor_1 = f"{aciertos_map.get(modalidad_1, 0)}/6"
-                            valor_2 = f"{aciertos_map.get(modalidad_2, 0)}/6"
-                            valor_3 = f"{aciertos_map.get(modalidad_3, 0)}/6"
-                            valor_4 = f"{aciertos_map.get(modalidad_4, 0)}/6"
-                            total_aciertos = sum(r['aciertos'] for r in resultados_modalidad)
+                        modalidades_juego = obtener_config_juego(juego_key).get('modalidades', [])
+                        if not modalidades_juego:
+                            modalidades_juego = ['Modalidad 1', 'Modalidad 2', 'Modalidad 3', 'Modalidad 4']
 
-                            plus_texto = '-'
-                            if evaluacion.get('plus_disponible'):
-                                plus_texto = f"{evaluacion.get('acierto_plus', 0)}/1"
+                        plus_entry = entry.get('numero_plus')
 
-                            tabla_compacta_html = (
-                                "<table style='border-collapse: collapse; width: 100%; font-size: 0.80rem;'>"
-                                "<thead>"
-                                "<tr style='background: #f5f5f5;'>"
-                                "<th style='text-align:left; padding: 4px 6px; border: 1px solid #e6e6e6;'>Fecha</th>"
-                                "<th style='text-align:left; padding: 4px 6px; border: 1px solid #e6e6e6;'>Trad</th>"
-                                "<th style='text-align:left; padding: 4px 6px; border: 1px solid #e6e6e6;'>Seg/Match</th>"
-                                "<th style='text-align:left; padding: 4px 6px; border: 1px solid #e6e6e6;'>Rev/Desq</th>"
-                                "<th style='text-align:left; padding: 4px 6px; border: 1px solid #e6e6e6;'>SS/Sale</th>"
-                                "<th style='text-align:left; padding: 4px 6px; border: 1px solid #e6e6e6;'>Plus</th>"
-                                "<th style='text-align:left; padding: 4px 6px; border: 1px solid #e6e6e6;'>Total</th>"
-                                "</tr>"
-                                "</thead>"
-                                "<tbody>"
-                                f"<tr>"
-                                f"<td style='padding: 4px 6px; border: 1px solid #e6e6e6;'>{evaluacion['fecha_real']}</td>"
-                                f"<td style='padding: 4px 6px; border: 1px solid #e6e6e6;' title='{modalidad_1}'>{valor_1}</td>"
-                                f"<td style='padding: 4px 6px; border: 1px solid #e6e6e6;' title='{modalidad_2}'>{valor_2}</td>"
-                                f"<td style='padding: 4px 6px; border: 1px solid #e6e6e6;' title='{modalidad_3}'>{valor_3}</td>"
-                                f"<td style='padding: 4px 6px; border: 1px solid #e6e6e6;' title='{modalidad_4}'>{valor_4}</td>"
-                                f"<td style='padding: 4px 6px; border: 1px solid #e6e6e6;'>{plus_texto}</td>"
-                                f"<td style='padding: 4px 6px; border: 1px solid #e6e6e6; font-weight: 700;'>{total_aciertos}/24</td>"
-                                f"</tr>"
-                                "</tbody>"
-                                "</table>"
-                            )
-                        elif evaluacion and evaluacion.get('estado') == 'pendiente':
-                            tabla_compacta_html = "<div style='color:#888; font-size:0.82rem;'>Aciertos: pendiente de sorteo real</div>"
-                        else:
-                            tabla_compacta_html = "<div style='color:#888; font-size:0.82rem;'>Aciertos: sin datos para evaluar</div>"
-                        
                         # Construir stats inline
                         stats_parts = []
-                        if 'suma_total' in entry['scores']:
+                        if 'scores' in entry and 'suma_total' in entry['scores']:
                             stats_parts.append(f"Suma: {entry['scores']['suma_total']}")
                             stats_parts.append(f"Score: {entry['scores']['score_promedio']:.3f}")
                             stats_parts.append(f"Pares: {entry['scores']['pares']}/6")
                         stats_texto = " &nbsp;|&nbsp; ".join(stats_parts)
-                        
+
+                        filas_modalidad_html = []
+                        for idx, modalidad in enumerate(modalidades_juego):
+                            coincidencias_modalidad = coincidencias_map.get(modalidad, set())
+
+                            numeros_html_parts = []
+                            for n in entry['prediccion']:
+                                if int(n) in coincidencias_modalidad:
+                                    numeros_html_parts.append(
+                                        f"<span style='display:inline-flex;align-items:center;justify-content:center;"
+                                        f"width:24px;height:24px;border-radius:50%;background:#2e7d32;color:#fff;"
+                                        f"font-size:0.80rem;font-weight:700;margin-right:4px;'>{int(n):02d}</span>"
+                                    )
+                                else:
+                                    numeros_html_parts.append(f"<span>{int(n):02d}</span>")
+
+                            numeros_texto = "<span style='display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap;'>" + "".join(numeros_html_parts) + "</span>"
+                            if plus_entry is not None:
+                                numeros_texto += f" &nbsp;+&nbsp; <span style='color:#F2A100;font-weight:700;'>Plus: {plus_entry}</span>"
+
+                            stats_columna = stats_texto if idx == 0 else ""
+                            borde_fila = "border-bottom: 1px solid rgba(200,200,200,0.2);" if idx < len(modalidades_juego) - 1 else ""
+
+                            filas_modalidad_html.append(
+                                f"<div style='display:flex;align-items:center;gap:20px;padding:5px 0;{borde_fila}'>"
+                                f"<div style='min-width: 220px; font-weight: 600; color: #F2A100; font-size: 0.85rem;'>{juego_entry} - {entry['metodo']} - {modalidad}</div>"
+                                f"<div style='font-size: 0.95rem; min-width: 220px;'>{numeros_texto}</div>"
+                                f"<div style='color: #888; font-size: 0.82rem;'>{stats_columna}</div>"
+                                f"</div>"
+                            )
+
                         st.markdown(
-                            f"<div style='display: flex; align-items: center; gap: 20px; padding: 5px 0; "
-                            f"border-bottom: 1px solid rgba(200,200,200,0.3);'>"
-                            f"<div style='min-width: 220px; font-weight: 600; color: #F2A100; font-size: 0.85rem;'>{juego_entry} - {entry['metodo']}</div>"
-                            f"<div style='font-size: 0.95rem; min-width: 220px;'>{numeros_texto}</div>"
-                            f"<div style='color: #888; font-size: 0.82rem;'>{stats_texto}</div>"
-                            f"</div>"
-                            f"<div style='padding: 2px 0 8px 0; margin-left: 0px;'>"
-                            f"{tabla_compacta_html}"
+                            f"<div style='border-bottom: 1px solid rgba(200,200,200,0.3);'>"
+                            f"{''.join(filas_modalidad_html)}"
                             f"</div>",
                             unsafe_allow_html=True
                         )

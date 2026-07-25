@@ -15,6 +15,150 @@ from pathlib import Path
 import requests
 from bs4 import BeautifulSoup
 
+
+def _normalizar_premio_texto(premio_texto):
+    """Convierte un texto de premio a solo dígitos enteros."""
+    if premio_texto is None:
+        return None
+    premio = str(premio_texto).strip()
+    if not premio:
+        return None
+    premio = premio.replace('$', '').replace('.', '').split(',')[0].strip()
+    premio = re.sub(r'[^\d]', '', premio)
+    return premio or None
+
+
+def _normalizar_ganadores_texto(ganadores_texto):
+    """Normaliza el texto de ganadores para mantener el criterio existente."""
+    if ganadores_texto is None:
+        return None
+    ganadores = str(ganadores_texto).strip()
+    if not ganadores:
+        return None
+    return ganadores
+
+
+def _mapear_modalidad_desde_titulo(titulo):
+    """Mapea el título del bloque HTML a la modalidad interna."""
+    titulo = (titulo or '').strip().lower()
+    if 'tradicional' in titulo and 'primer' in titulo:
+        return 'Tradicional'
+    if 'segunda' in titulo:
+        return 'Segunda'
+    if 'revancha' in titulo:
+        return 'Revancha'
+    if 'siempre sale' in titulo:
+        return 'SiempreSale'
+    return None
+
+
+def _extraer_pozos_desde_soup(soup):
+    """Extrae pozos desde el HTML nuevo de QuiniYa."""
+    pozos = {
+        'Tradicional': {'premio': None, 'ganadores': None},
+        'Segunda': {'premio': None, 'ganadores': None},
+        'Revancha': {'premio': None, 'ganadores': None},
+        'SiempreSale': {'premio': None, 'ganadores': None}
+    }
+
+    main = soup.select_one('main#main-content') or soup
+    bloques = main.select('div.shadow')
+
+    print(f"Bloques de sorteo encontrados: {len(bloques)}")
+
+    for idx, bloque in enumerate(bloques):
+        try:
+            titulo_elem = bloque.select_one('h2')
+            titulo = titulo_elem.get_text(' ', strip=True) if titulo_elem else ''
+            modalidad_key = _mapear_modalidad_desde_titulo(titulo)
+            if not modalidad_key:
+                continue
+
+            tabla = bloque.select_one('table')
+            if not tabla:
+                continue
+
+            filas = tabla.select('tbody tr') or tabla.select('tr')
+            if not filas:
+                continue
+
+            print(f"  Bloque {idx + 1}: {modalidad_key} detectado")
+
+            for fila_idx, fila in enumerate(filas):
+                celdas = fila.find_all(['th', 'td'])
+                if len(celdas) < 3:
+                    continue
+
+                aciertos = celdas[0].get_text(' ', strip=True)
+                ganadores = _normalizar_ganadores_texto(celdas[1].get_text(' ', strip=True))
+                premio = _normalizar_premio_texto(celdas[2].get_text(' ', strip=True))
+
+                if not premio:
+                    continue
+
+                if modalidad_key in ('Tradicional', 'Segunda', 'Revancha'):
+                    if aciertos == '6' and pozos[modalidad_key]['premio'] is None:
+                        pozos[modalidad_key] = {'premio': premio, 'ganadores': ganadores}
+                        print(f"  {modalidad_key}: ${premio} - {ganadores}")
+                        break
+                elif modalidad_key == 'SiempreSale':
+                    if pozos['SiempreSale']['premio'] is None:
+                        pozos['SiempreSale'] = {'premio': premio, 'ganadores': ganadores}
+                        print(f"  Siempre Sale: ${premio} - {ganadores} ({aciertos} aciertos)")
+                        break
+
+        except Exception:
+            continue
+
+    return pozos
+
+
+def _extraer_historico_desde_soup(soup):
+    """Extrae todos los sorteos históricos desde la tabla nueva de /sorteos."""
+    sorteos = []
+
+    main = soup.select_one('main#main-content') or soup
+    tabla = main.select_one('div.qy-table-scroll table') or main.select_one('table.table')
+    if not tabla:
+        return sorteos
+
+    filas = tabla.select('tbody tr') or tabla.select('tr')
+    if not filas:
+        return sorteos
+
+    # Si existe thead, la primera fila de tr no debe saltarse porque usamos tbody;
+    # si no hay tbody, descartamos cabecera por contenido.
+    for fila in filas:
+        celdas = fila.find_all(['th', 'td'])
+        if len(celdas) < 6:
+            continue
+
+        fecha_str = celdas[0].get_text(' ', strip=True)
+        fecha = parse_fecha_quiniya(fecha_str)
+        if not fecha:
+            continue
+
+        series = {
+            'Tradicional': celdas[1].get_text(' ', strip=True),
+            'Segunda': celdas[2].get_text(' ', strip=True),
+            'Revancha': celdas[3].get_text(' ', strip=True),
+            'SiempreSale': celdas[4].get_text(' ', strip=True),
+        }
+
+        for modalidad, numeros_str in series.items():
+            numeros = [int(n) for n in re.findall(r'\d{1,2}', numeros_str)]
+            if len(numeros) != 6:
+                continue
+
+            sorteos.append({
+                'fecha': fecha,
+                'fecha_original': fecha_str,
+                'modalidad': modalidad,
+                'numeros': numeros,
+            })
+
+    return sorteos
+
 def configurar_driver():
     chrome_options = Options()
     chrome_options.add_argument('--headless=new')
@@ -66,39 +210,10 @@ def extraer_tabla_principal(driver):
         print(f"\nAccediendo a: {url}")
         driver.get(url)
         time.sleep(3)
-        
-        # Encontrar la tabla
-        tabla = driver.find_element(By.CSS_SELECTOR, 'table.table')
-        filas = tabla.find_elements(By.TAG_NAME, 'tr')[1:]  # Saltar header
-        
-        print(f"Filas encontradas: {len(filas)}")
-        
-        for fila in filas:
-            try:
-                celdas = fila.find_elements(By.TAG_NAME, 'td')
-                
-                if len(celdas) >= 5:
-                    fecha_str = celdas[0].text.strip()
-                    fecha = parse_fecha_quiniya(fecha_str)
-                    
-                    series = {
-                        'Tradicional': celdas[1].text.strip(),
-                        'Segunda': celdas[2].text.strip(),
-                        'Revancha': celdas[3].text.strip(),
-                        'SiempreSale': celdas[4].text.strip()
-                    }
-                    
-                    for modalidad, numeros_str in series.items():
-                        numeros = [int(n) for n in numeros_str.split()]
-                        if fecha and len(numeros) == 6:
-                            sorteos.append({
-                                'fecha': fecha,
-                                'fecha_original': fecha_str,
-                                'modalidad': modalidad,
-                                'numeros': numeros
-                            })
-            except Exception:
-                continue
+        soup = BeautifulSoup(driver.page_source, 'html.parser')
+        sorteos = _extraer_historico_desde_soup(soup)
+
+        print(f"Filas encontradas: {len(sorteos) // 4 if sorteos else 0}")
         
         print(f"✓ Extraídos {len(sorteos)} sorteos de la tabla")
         
@@ -331,67 +446,8 @@ def obtener_pozos_rapido():
         
         print("Página cargada, parseando HTML...")
         soup = BeautifulSoup(response.content, 'html.parser')
-        
-        pozos = {
-            'Tradicional': {'premio': None, 'ganadores': None},
-            'Segunda': {'premio': None, 'ganadores': None},
-            'Revancha': {'premio': None, 'ganadores': None},
-            'SiempreSale': {'premio': None, 'ganadores': None}
-        }
-        
-        # Buscar todos los h2 (títulos de modalidades)
-        headers_h2 = soup.find_all('h2', class_='text-center')
-        
-        for h2 in headers_h2:
-            titulo = h2.get_text().strip().lower()
-            
-            # Encontrar la tabla más cercana después de este h2
-            parent = h2.find_parent('div', class_='shadow')
-            if not parent:
-                continue
-            
-            tabla = parent.find('table', class_='table')
-            if not tabla:
-                continue
-            
-            # Determinar modalidad
-            modalidad_key = None
-            if 'tradicional' in titulo and 'primer' in titulo:
-                modalidad_key = 'Tradicional'
-                aciertos_buscar = '6'
-            elif 'segunda' in titulo:
-                modalidad_key = 'Segunda'
-                aciertos_buscar = '6'
-            elif 'revancha' in titulo:
-                modalidad_key = 'Revancha'
-                aciertos_buscar = '6'
-            elif 'siempre sale' in titulo:
-                modalidad_key = 'SiempreSale'
-                aciertos_buscar = '5'  # Siempre Sale usa 5 aciertos
-            
-            if not modalidad_key:
-                continue
-            
-            # Buscar la primera fila con aciertos correctos
-            filas = tabla.find('tbody').find_all('tr')
-            for fila in filas:
-                celdas = fila.find_all('td')
-                if len(celdas) >= 3:
-                    aciertos = celdas[0].get_text().strip()
-                    ganadores = celdas[1].get_text().strip()
-                    premio = celdas[2].get_text().strip()
-                    
-                    if aciertos == aciertos_buscar:
-                        # Limpiar premio: remover separadores de miles (.) y descartar centavos (,XX)
-                        # Ej: "14.589.562,05" → "14589562"
-                        premio_limpio = premio.replace('.', '').split(',')[0].strip()
-                        
-                        pozos[modalidad_key] = {
-                            'premio': premio_limpio,
-                            'ganadores': ganadores
-                        }
-                        print(f"  {modalidad_key}: ${premio_limpio} - {ganadores}")
-                        break
+
+        pozos = _extraer_pozos_desde_soup(soup)
         
         # Verificar cuántos pozos se obtuvieron
         pozos_count = sum(1 for v in pozos.values() if v and v.get('premio'))
@@ -430,160 +486,21 @@ def obtener_pozos_ultimo_sorteo():
         try:
             driver.get(url)
             print("Página cargada, esperando elementos...")
-            time.sleep(2)  # Reducido de 3 a 2 segundos
-            print("Buscando secciones...")
+            time.sleep(2)
+            print("Buscando bloques de sorteo...")
         except Exception as e:
             print(f"✗ Error al cargar la página: {e}")
             return None
         
-        pozos = {
-            'Tradicional': {'premio': None, 'ganadores': None},
-            'Segunda': {'premio': None, 'ganadores': None},
-            'Revancha': {'premio': None, 'ganadores': None},
-            'SiempreSale': {'premio': None, 'ganadores': None}
-        }
-        
-        # Obtener todo el HTML de la página
-        page_html = driver.page_source
-        
-        # Buscar todas las secciones con encabezados
         try:
-            sections = driver.find_elements(By.TAG_NAME, 'section')
-            print(f"Secciones encontradas: {len(sections)}")
+            soup = BeautifulSoup(driver.page_source, 'html.parser')
+            main = soup.select_one('main#main-content') or soup
+            bloques = main.select('div.shadow')
+            print(f"Bloques de sorteo encontrados: {len(bloques)}")
+            pozos = _extraer_pozos_desde_soup(soup)
         except Exception as e:
-            print(f"Error buscando secciones: {e}")
-            sections = []
-        
-        pozos_count = 0
-        for idx, section in enumerate(sections):
-            try:
-                section_text = section.text.lower()
-                
-                # Buscar tabla dentro de esta sección
-                try:
-                    tabla = section.find_element(By.TAG_NAME, 'table')
-                except:
-                    continue
-                
-                filas = tabla.find_elements(By.TAG_NAME, 'tr')
-                
-                # Determinar tipo de modalidad basado en el texto de la sección
-                es_tradicional = 'tradicional' in section_text and 'primer sorteo' in section_text
-                es_segunda = 'la segunda' in section_text or ('segunda' in section_text and 'tradicional' not in section_text)
-                es_revancha = 'revancha' in section_text
-                es_siempre_sale = 'siempre sale' in section_text
-                
-                modalidad_detectada = None
-                if es_tradicional:
-                    modalidad_detectada = "Tradicional"
-                elif es_segunda:
-                    modalidad_detectada = "Segunda"
-                elif es_revancha:
-                    modalidad_detectada = "Revancha"
-                elif es_siempre_sale:
-                    modalidad_detectada = "Siempre Sale"
-                
-                if modalidad_detectada:
-                    print(f"  Sección {idx+1}: {modalidad_detectada} detectado")
-                
-                for fila in filas:
-                    try:
-                        celdas = fila.find_elements(By.TAG_NAME, 'td')
-                        if len(celdas) >= 3:
-                            aciertos = celdas[0].text.strip()
-                            col2_texto = celdas[1].text.strip()
-                            premio_texto = celdas[2].text.strip()
-                            
-                            # Limpiar el número: remover $ y separadores de miles (.), descartar centavos (,XX)
-                            # Ej: "$14.589.562,05" → "14589562"
-                            premio = premio_texto.replace('$', '').replace('.', '').split(',')[0].strip()
-                            
-                            # Tradicional: primer premio de 6 aciertos (pozo vacante o con ganadores)
-                            if es_tradicional and aciertos == '6' and pozos['Tradicional']['premio'] is None:
-                                pozos['Tradicional'] = {'premio': premio, 'ganadores': col2_texto}
-                                print(f"  Tradicional: ${premio} - {col2_texto}")
-                            
-                            # Segunda: primer premio de 6 aciertos (pozo vacante o con ganadores)
-                            elif es_segunda and aciertos == '6' and pozos['Segunda']['premio'] is None:
-                                pozos['Segunda'] = {'premio': premio, 'ganadores': col2_texto}
-                                print(f"  Segunda: ${premio} - {col2_texto}")
-                            
-                            # Revancha: primer premio de 6 aciertos
-                            elif es_revancha and aciertos == '6' and pozos['Revancha']['premio'] is None:
-                                pozos['Revancha'] = {'premio': premio, 'ganadores': col2_texto}
-                                print(f"  Revancha: ${premio} - {col2_texto}")
-                            
-                            # Siempre Sale: primer premio (cualquier cantidad de aciertos 1-6)
-                            elif es_siempre_sale and pozos['SiempreSale']['premio'] is None:
-                                pozos['SiempreSale'] = {'premio': premio, 'ganadores': col2_texto}
-                                print(f"  Siempre Sale: ${premio} - {col2_texto} ({aciertos} aciertos)")
-                    
-                    except Exception:
-                        continue
-            
-            except Exception:
-                continue
-        
-        # Si no se encontraron con sections, intentar búsqueda directa
-        if not any(p.get('premio') for p in pozos.values()):
-            try:
-                tablas = driver.find_elements(By.CSS_SELECTOR, 'table.table')
-                
-                for i, tabla in enumerate(tablas):
-                    # Buscar el encabezado más cercano antes de esta tabla
-                    try:
-                        # Obtener elemento padre y buscar h2/h3 hermanos
-                        parent = tabla.find_element(By.XPATH, '..')
-                        titulo_elem = None
-                        
-                        try:
-                            titulo_elem = parent.find_element(By.XPATH, './preceding-sibling::*[self::h2 or self::h3][1]')
-                        except:
-                            try:
-                                titulo_elem = parent.find_element(By.XPATH, './/h2 | .//h3')
-                            except:
-                                pass
-                        
-                        titulo = titulo_elem.text.lower() if titulo_elem else ''
-                        
-                        # También revisar el HTML alrededor
-                        tabla_html = tabla.get_attribute('outerHTML').lower()
-                        
-                        filas = tabla.find_elements(By.TAG_NAME, 'tr')
-                        
-                        for fila in filas:
-                            try:
-                                celdas = fila.find_elements(By.TAG_NAME, 'td')
-                                if len(celdas) >= 3:
-                                    aciertos = celdas[0].text.strip()
-                                    col2_texto = celdas[1].text.strip()
-                                    premio_texto = celdas[2].text.strip()
-                                    
-                                    # Limpiar: remover $ y separadores de miles (.), descartar centavos (,XX)
-                                    premio = premio_texto.replace('$', '').replace('.', '').split(',')[0].strip()
-                                    
-                                    # Identificar según título - capturar SIEMPRE el primer premio de 6/5 aciertos
-                                    if aciertos == '6' and 'tradicional' in titulo and pozos['Tradicional']['premio'] is None:
-                                        pozos['Tradicional'] = {'premio': premio, 'ganadores': col2_texto}
-                                        print(f"  Tradicional: ${premio} - {col2_texto}")
-                                    elif aciertos == '6' and 'segunda' in titulo and pozos['Segunda']['premio'] is None:
-                                        pozos['Segunda'] = {'premio': premio, 'ganadores': col2_texto}
-                                        print(f"  Segunda: ${premio} - {col2_texto}")
-                                    elif aciertos == '6' and 'revancha' in titulo and pozos['Revancha']['premio'] is None:
-                                        pozos['Revancha'] = {'premio': premio, 'ganadores': col2_texto}
-                                        print(f"  Revancha: ${premio} - {col2_texto}")
-                                    elif 'siempre sale' in titulo and pozos['SiempreSale']['premio'] is None:
-                                        pozos['SiempreSale'] = {'premio': premio, 'ganadores': col2_texto}
-                                        print(f"  Siempre Sale: ${premio} - {col2_texto} ({aciertos} aciertos)")
-                            
-                            except Exception:
-                                continue
-                    
-                    except Exception:
-                        continue
-            
-            except Exception as e:
-                print(f"  Error en búsqueda alternativa: {e}")
+            print(f"  Error parseando HTML con Selenium: {e}")
+            return None
         
         print(f"\n✓ Pozos obtenidos:")
         for modalidad, data in pozos.items():
