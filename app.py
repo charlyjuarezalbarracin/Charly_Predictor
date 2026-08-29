@@ -1326,7 +1326,6 @@ def controlar_boleta(numeros_jugados, data, fecha_seleccionada=None, juego='quin
     return resultados
 
 
-@st.cache_data
 def cargar_resultados_reales_historial(juego='quini6'):
     """Carga sorteos reales desde CSV para evaluar aciertos del historial."""
     config_juego = obtener_config_juego(juego)
@@ -1379,8 +1378,108 @@ def inferir_juego_historial(juego_nombre):
     return 'quini6'
 
 
+def extraer_fecha_historial(timestamp):
+    """Normaliza la fecha guardada en cada entrada del historial."""
+    if not timestamp:
+        return ''
+
+    try:
+        if isinstance(timestamp, str):
+            if ' ' in timestamp:
+                return timestamp.split(' ')[0]
+            return timestamp
+        return str(timestamp).split(' ')[0]
+    except Exception:
+        return str(timestamp).split(' ')[0] if isinstance(timestamp, str) else ''
+
+
+def orden_metodo_historial(metodo):
+    """Define el orden visual de los métodos dentro de una misma fecha."""
+    nombre = str(metodo or '').lower()
+    if 'estándar' in nombre or 'standard' in nombre:
+        return 0
+    if 'condicional' in nombre or 'conditional' in nombre:
+        return 1
+    if 'análisis rápido' in nombre or 'analisis rapido' in nombre or 'rápido' in nombre or 'rapido' in nombre:
+        return 2
+    return 99
+
+
+def normalizar_metodo_base(metodo):
+    """Reduce el nombre del método (con sufijos como '+ Optimizer') a su categoría base."""
+    nombre = str(metodo or '').lower()
+    if 'estándar' in nombre or 'standard' in nombre:
+        return 'Estándar'
+    if 'condicional' in nombre or 'conditional' in nombre:
+        return 'Condicional'
+    if 'rápido' in nombre or 'rapido' in nombre:
+        return 'Rápido'
+    return str(metodo or 'Otro')
+
+
+def calcular_mejor_metodo_historial():
+    """Calcula qué método base acierta más según el historial evaluado contra resultados reales."""
+    historial = st.session_state.get('historial', [])
+    if not historial:
+        return None
+
+    juego_actual = st.session_state.get('juego_actual', 'quini6')
+    historial_filtrado = [
+        e for e in historial
+        if inferir_juego_historial(e.get('juego', 'Quini 6')) == juego_actual
+    ]
+    if not historial_filtrado:
+        return None
+
+    try:
+        df_real = cargar_resultados_reales_historial(juego_actual)
+    except Exception:
+        return None
+    if df_real is None or df_real.empty:
+        return None
+
+    stats = {}  # metodo_base -> [aciertos, numeros_evaluados]
+    for entry in historial_filtrado:
+        evaluacion = evaluar_entry_historial_con_real(entry, df_real)
+        if not evaluacion or evaluacion.get('estado') != 'ok':
+            continue
+
+        metodo_base = normalizar_metodo_base(entry.get('metodo', ''))
+        for resultado in evaluacion.get('resultados_modalidad', []):
+            acumulado = stats.setdefault(metodo_base, [0, 0])
+            acumulado[0] += resultado.get('aciertos', 0)
+            acumulado[1] += 6
+
+    mejor = None
+    for metodo_base, (aciertos, total) in stats.items():
+        if total == 0:
+            continue
+        pct = (aciertos / total) * 100
+        if mejor is None or pct > mejor[1]:
+            mejor = (metodo_base, pct)
+
+    return mejor
+
+
+def agrupar_historial_por_fecha(historial):
+    """Agrupa entradas del historial por fecha, no por timestamp exacto."""
+    from collections import OrderedDict
+
+    grupos = OrderedDict()
+    for entry in historial:
+        fecha = extraer_fecha_historial(entry.get('timestamp', ''))
+        if not fecha:
+            fecha = 'Sin fecha'
+        grupos.setdefault(fecha, []).append(entry)
+
+    for fecha, entradas in grupos.items():
+        grupos[fecha] = sorted(entradas, key=lambda e: orden_metodo_historial(e.get('metodo', '')))
+
+    return grupos
+
+
 def evaluar_entry_historial_con_real(entry, df_real):
-    """Evalúa una predicción del historial contra todos los sorteos de la primera fecha disponible."""
+    """Evalúa una predicción del historial contra los sorteos reales del mismo día."""
     if df_real is None or df_real.empty:
         return None
 
@@ -1391,16 +1490,20 @@ def evaluar_entry_historial_con_real(entry, df_real):
     try:
         fecha_pred = datetime.strptime(entry.get('timestamp', ''), "%Y-%m-%d %H:%M:%S").date()
     except Exception:
+        fecha_pred = None
+
+    if fecha_pred is None:
         return None
 
-    candidatos = df_real[df_real['fecha'] >= fecha_pred]
-    if candidatos.empty:
+    # Las predicciones se generan antes del próximo sorteo y el historial conserva la fecha de creación.
+    fechas_disponibles = sorted(df_real.loc[df_real['fecha'] >= fecha_pred, 'fecha'].unique())
+    fecha_real = fechas_disponibles[0] if fechas_disponibles else None
+    sorteos_fecha = df_real[df_real['fecha'] == fecha_real] if fecha_real is not None else df_real.iloc[0:0]
+    if sorteos_fecha.empty:
         return {
-            'estado': 'pendiente'
+            'estado': 'pendiente',
+            'fecha_real': str(fecha_pred),
         }
-
-    fecha_objetivo = candidatos['fecha'].min()
-    sorteos_fecha = candidatos[candidatos['fecha'] == fecha_objetivo]
 
     pred_set = set(int(n) for n in prediccion)
     resultados_modalidad = []
@@ -1419,7 +1522,7 @@ def evaluar_entry_historial_con_real(entry, df_real):
 
     resultado = {
         'estado': 'ok',
-        'fecha_real': str(fecha_objetivo),
+        'fecha_real': str(fecha_real),
         'resultados_modalidad': resultados_modalidad,
     }
 
@@ -1482,7 +1585,11 @@ def init_session_state():
 
 
 def agregar_al_historial(prediccion, metodo, scores_info, numero_plus=None):
-    """Agregar predicción al historial y guardar en JSON"""
+    """Agregar predicción al historial y guardar en JSON.
+
+    Se conserva el historial completo para que nunca se pierdan las predicciones
+    anteriores por un límite artificial.
+    """
     entry = {
         'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         'juego': obtener_config_juego()['nombre'],
@@ -1492,10 +1599,8 @@ def agregar_al_historial(prediccion, metodo, scores_info, numero_plus=None):
         'numero_plus': numero_plus
     }
     st.session_state.historial.insert(0, entry)  # Más reciente primero
-    if len(st.session_state.historial) > 20:  # Mantener solo últimas 20
-        st.session_state.historial.pop()
     st.session_state.prediction_count += 1
-    
+
     # Guardar en JSON
     guardar_historial_json()
 
@@ -2935,7 +3040,13 @@ def main():
                         nums_std = ', '.join([f"{int(n):02d}" for n in result['standard']['combination']])
                         nums_cond = ', '.join([f"{int(n):02d}" for n in result['conditional']['combination']])
                         nums_rapido = ', '.join([f"{int(n):02d}" for n in prediccion_rapida['numeros']])
-                        texto_copiar = f"{nombre_juego_copiar}:\nEstándar{opt_suffix}: {nums_std}\nCondicional{opt_suffix}: {nums_cond}\nRápido: {nums_rapido}\n\n" + "\n".join(lineas_pozos)
+                        texto_copiar = f"{nombre_juego_copiar}:\nEstándar{opt_suffix}: {nums_std}\nCondicional{opt_suffix}: {nums_cond}\nRápido: {nums_rapido}\n"
+
+                        mejor_metodo = calcular_mejor_metodo_historial()
+                        if mejor_metodo:
+                            texto_copiar += f"Mejor método: {mejor_metodo[0]} ({mejor_metodo[1]:.1f}% aciertos)\n"
+
+                        texto_copiar += "\n" + "\n".join(lineas_pozos)
                     else:
                         texto_copiar = ', '.join([f"{int(n):02d}" for n in result['combination']])
                         if usar_optimizer:
@@ -3524,20 +3635,12 @@ def main():
                 except Exception:
                     resultados_reales_cache[juego_key] = None
 
-            # Agrupar predicciones por timestamp (misma fecha/hora = misma sesión)
-            from collections import OrderedDict
-            grupos_historial = OrderedDict()
-            for i, entry in enumerate(historial_filtrado):
-                ts = entry['timestamp']
-                if ts not in grupos_historial:
-                    grupos_historial[ts] = []
-                grupos_historial[ts].append(entry)
-            
-            for ts, entries in grupos_historial.items():
+            grupos_historial = agrupar_historial_por_fecha(historial_filtrado)
+
+            for fecha, entries in grupos_historial.items():
                 n_preds = len(entries)
-                metodos = ', '.join([e['metodo'] for e in entries])
-                label = f"{ts} - {n_preds} prediccion{'es' if n_preds > 1 else ''}"
-                
+                label = f"{fecha} - {n_preds} prediccion{'es' if n_preds > 1 else ''}"
+
                 with st.expander(label):
                     for entry in entries:
                         juego_entry = entry.get('juego', 'Quini 6')
