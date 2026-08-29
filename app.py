@@ -17,7 +17,7 @@ from pathlib import Path
 # Importaciones del core
 from core.data import DataLoader
 from core.analysis import FrequencyAnalyzer, CorrelationAnalyzer, PatternAnalyzer
-from core.scoring import UnifiedScorer
+from core.scoring import UnifiedScorer, WeightManager
 from core.generator import StrategyManager, GenerationStrategy, PortfolioGenerator
 from core.generator.optimizer import CombinationOptimizer
 from core.backtesting import WalkForwardBacktester
@@ -39,6 +39,7 @@ except ImportError:
     }
     OPTIMAL_STRATEGY = 'BOTH'
 
+weight_manager = WeightManager()
 
 # ============================================================================
 # CONFIGURACIÓN DE LA PÁGINA
@@ -2603,32 +2604,94 @@ def main():
             )
             
             st.markdown("#### Pesos de Scoring")
+
+            weights_default = {
+                'peso_frecuencia': st.session_state.get('peso_frecuencia', OPTIMAL_WEIGHTS['peso_frecuencia']),
+                'peso_frecuencia_reciente': st.session_state.get('peso_frecuencia_reciente', OPTIMAL_WEIGHTS['peso_frecuencia_reciente']),
+                'peso_ciclo': st.session_state.get('peso_ciclo', OPTIMAL_WEIGHTS['peso_ciclo']),
+                'peso_latencia': st.session_state.get('peso_latencia', OPTIMAL_WEIGHTS['peso_latencia']),
+                'peso_tendencia': st.session_state.get('peso_tendencia', OPTIMAL_WEIGHTS['peso_tendencia']),
+            }
             
             peso_frecuencia = st.slider(
                 "Frecuencia General",
-                0.0, 1.0, OPTIMAL_WEIGHTS['peso_frecuencia'], 0.05
+                0.0, 1.0, weights_default['peso_frecuencia'], 0.05
             )
+            st.session_state['peso_frecuencia'] = peso_frecuencia
             
             peso_frecuencia_reciente = st.slider(
                 "Frecuencia Reciente",
-                0.0, 1.0, OPTIMAL_WEIGHTS['peso_frecuencia_reciente'], 0.05
+                0.0, 1.0, weights_default['peso_frecuencia_reciente'], 0.05
             )
+            st.session_state['peso_frecuencia_reciente'] = peso_frecuencia_reciente
             
             peso_ciclo = st.slider(
                 "Ciclos",
-                0.0, 1.0, OPTIMAL_WEIGHTS['peso_ciclo'], 0.05
+                0.0, 1.0, weights_default['peso_ciclo'], 0.05
             )
+            st.session_state['peso_ciclo'] = peso_ciclo
             
             peso_latencia = st.slider(
                 "Latencia",
-                0.0, 1.0, OPTIMAL_WEIGHTS['peso_latencia'], 0.05,
-                help="âš ï¸ Optimización: Latencia en 0.00 mejora el rendimiento"
+                0.0, 1.0, weights_default['peso_latencia'], 0.05,
+                help="Optimización: Latencia en 0.00 mejora el rendimiento"
             )
+            st.session_state['peso_latencia'] = peso_latencia
             
             peso_tendencia = st.slider(
                 "Tendencia",
-                0.0, 1.0, OPTIMAL_WEIGHTS['peso_tendencia'], 0.05
+                0.0, 1.0, weights_default['peso_tendencia'], 0.05
             )
+            st.session_state['peso_tendencia'] = peso_tendencia
+
+            st.markdown("---")
+
+            if st.button("Actualizar Parametros", type="secondary"):
+                if not st.session_state.get('data_loaded'):
+                    st.warning("Cargá los datos antes de optimizar los pesos.")
+                else:
+                    try:
+                        with st.spinner("Optimizando pesos con validación walk-forward..."):
+                            data = st.session_state.current_data
+                            train_window = max(120, min(200, len(data) - 60))
+                            test_window = 10
+                            step_size = 10
+
+                            optimization = weight_manager.optimize_walkforward(
+                                data,
+                                train_window=train_window,
+                                test_window=test_window,
+                                step_size=step_size,
+                                use_ideas=usar_regresion_equilibrio or usar_resonancia_ciclos or usar_multi_timeframe,
+                                use_idea1=usar_resonancia_ciclos,
+                                use_idea2=usar_multi_timeframe,
+                                use_idea3=usar_regresion_equilibrio,
+                                idea3_ventana=ventana_regresion if usar_regresion_equilibrio else 16,
+                                idea3_umbral=umbral_regresion / 100.0 if usar_regresion_equilibrio else 0.12,
+                            )
+
+                        best_weights = optimization['best_weights']
+                        peso_frecuencia = float(best_weights['peso_frecuencia'])
+                        peso_frecuencia_reciente = float(best_weights['peso_frecuencia_reciente'])
+                        peso_ciclo = float(best_weights['peso_ciclo'])
+                        peso_latencia = float(best_weights['peso_latencia'])
+                        peso_tendencia = float(best_weights['peso_tendencia'])
+
+                        st.session_state['peso_frecuencia'] = peso_frecuencia
+                        st.session_state['peso_frecuencia_reciente'] = peso_frecuencia_reciente
+                        st.session_state['peso_ciclo'] = peso_ciclo
+                        st.session_state['peso_latencia'] = peso_latencia
+                        st.session_state['peso_tendencia'] = peso_tendencia
+
+                        summary = optimization.get('summary', {})
+                        accuracy = summary.get('accuracy_promedio', 0.0)
+                        stability = optimization.get('results', {}).get('summary', {}).get('accuracy_std', 0.0)
+                        st.success(
+                            "Parámetros actualizados con validación histórica. "
+                            f"Accuracy promedio: {accuracy:.2%}, std: {stability:.2%}."
+                        )
+                    except Exception as exc:
+                        st.error(f"No se pudieron actualizar los parámetros: {exc}")
             
             st.markdown("---")
             
