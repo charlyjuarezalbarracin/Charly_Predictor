@@ -913,11 +913,11 @@ def calcular_inversion_portfolio(capital_inicial, pct_pf, tasa_pf, pct_fci_cer, 
     Args:
         capital_inicial: Capital total a invertir
         pct_pf: Porcentaje en plazo fijo (0-100)
-        tasa_pf: Tasa mensual plazo fijo (%)
+        tasa_pf: Tasa anual plazo fijo (%)
         pct_fci_cer: Porcentaje en FCI CER (0-100)
-        tasa_fci_cer: Tasa mensual FCI CER (%)
+        tasa_fci_cer: Tasa anual FCI CER (%)
         pct_fci_usd: Porcentaje en FCI USD (0-100)
-        tasa_fci_usd: Tasa mensual FCI USD (%)
+        tasa_fci_usd: Tasa anual FCI USD (%)
         inflacion_mensual: Inflación mensual (%)
         meses: Número de meses a proyectar
         gastos_iniciales: Dict con {mes: monto} de gastos editables desde grilla
@@ -955,10 +955,15 @@ def calcular_inversion_portfolio(capital_inicial, pct_pf, tasa_pf, pct_fci_cer, 
         # Capital total al inicio del mes
         acumulado = capital_pf + capital_cer + capital_usd
         
+        # Las tasas se ingresan como anuales y se convierten a tasa mensual equivalente
+        tasa_pf_mensual = (tasa_pf / 100) / 12
+        tasa_cer_mensual = (tasa_fci_cer / 100) / 12
+        tasa_usd_mensual = (tasa_fci_usd / 100) / 12
+        
         # Rentabilidad de cada activo
-        rent_pf = capital_pf * (tasa_pf / 100)
-        rent_cer = capital_cer * (tasa_fci_cer / 100)
-        rent_usd = capital_usd * (tasa_fci_usd / 100)
+        rent_pf = capital_pf * tasa_pf_mensual
+        rent_cer = capital_cer * tasa_cer_mensual
+        rent_usd = capital_usd * tasa_usd_mensual
         
         rentabilidad_total = rent_pf + rent_cer + rent_usd
         
@@ -3084,17 +3089,30 @@ def main():
                     # Preparar texto para copiar
                     opt_suffix = " (Opt)" if usar_optimizer else ""
 
-                    if st.session_state.juego_actual == 'loto':
+                    lineas_pozos = []
+                    if st.session_state.juego_actual == 'loto' and st.session_state.pozos_loto:
+                        pozos = st.session_state.pozos_loto
+                        trad,  _ = formatear_pozo(pozos.get('Tradicional'))
+                        match, _ = formatear_pozo(pozos.get('Match'))
+                        desq,  _ = formatear_pozo(pozos.get('Desquite'))
+                        sale,  _ = formatear_pozo(pozos.get('SaleOSale'))
                         lineas_pozos = [
-                            "Tradicional: $2.953.483.488",
-                            "Match: $821.384.114",
-                            "Desquite: $1.268.201.915",
+                            f"Tradicional: ${trad}",
+                            f"Match: ${match}",
+                            f"Desquite: ${desq}",
+                            f"Sale o Sale: ${sale}",
                         ]
-                    else:
+                    elif st.session_state.juego_actual == 'quini6' and st.session_state.pozos_actuales:
+                        pozos = st.session_state.pozos_actuales
+                        trad,     _ = formatear_pozo(pozos.get('Tradicional'))
+                        segunda,  _ = formatear_pozo(pozos.get('Segunda'))
+                        revancha, _ = formatear_pozo(pozos.get('Revancha'))
+                        sale,     _ = formatear_pozo(pozos.get('SiempreSale'))
                         lineas_pozos = [
-                            "Tradicional: $5.060.737.231",
-                            "La Segunda: $2.346.625.033",
-                            "Revancha: $2.953.483.488",
+                            f"Tradicional: ${trad}",
+                            f"La Segunda: ${segunda}",
+                            f"Revancha: ${revancha}",
+                            f"Siempre Sale: ${sale}",
                         ]
 
                     nombre_juego_copiar = "Loto" if st.session_state.juego_actual == 'loto' else "Quini6"
@@ -3109,12 +3127,15 @@ def main():
                         if mejor_metodo:
                             texto_copiar += f"Mejor método: {mejor_metodo[0]} ({mejor_metodo[1]:.1f}% aciertos)\n"
 
-                        texto_copiar += "\n" + "\n".join(lineas_pozos)
+                        if lineas_pozos:
+                            texto_copiar += "\n" + "\n".join(lineas_pozos)
                     else:
                         texto_copiar = ', '.join([f"{int(n):02d}" for n in result['combination']])
                         if usar_optimizer:
                             texto_copiar = f"(Opt) {texto_copiar}"
-                        texto_copiar = f"{nombre_juego_copiar}:\n" + texto_copiar + "\n\n" + "\n".join(lineas_pozos)
+                        texto_copiar = f"{nombre_juego_copiar}:\n" + texto_copiar
+                        if lineas_pozos:
+                            texto_copiar += "\n\n" + "\n".join(lineas_pozos)
                     
                     # NÚMERO PLUS (solo para Loto, siempre)
                     if st.session_state.juego_actual == 'loto':
@@ -4183,21 +4204,21 @@ def main():
             pct_pf = st.number_input("Porcentaje (%)", value=30.0, min_value=0.0, max_value=100.0, step=5.0, format="%.1f", key="pct_pf", label_visibility="collapsed")
         with col_pf2:
             st.markdown('<p style="margin-bottom: 0.3rem;">PF Tasa</p>', unsafe_allow_html=True)
-            tasa_pf = st.number_input("Tasa mensual (%)", value=7.0, min_value=0.0, max_value=50.0, step=0.5, format="%.2f", key="tasa_pf", label_visibility="collapsed")
+            tasa_pf = st.number_input("Tasa anual (%)", value=84.0, min_value=0.0, max_value=500.0, step=1.0, format="%.2f", key="tasa_pf", label_visibility="collapsed")
         
         with col_cer1:
             st.markdown('<p style="margin-bottom: 0.3rem;">FCI CER %</p>', unsafe_allow_html=True)
             pct_cer = st.number_input("Porcentaje (%)", value=30.0, min_value=0.0, max_value=100.0, step=5.0, format="%.1f", key="pct_cer", label_visibility="collapsed")
         with col_cer2:
             st.markdown('<p style="margin-bottom: 0.3rem;">FCI CER Tasa</p>', unsafe_allow_html=True)
-            tasa_cer = st.number_input("Tasa mensual (%)", value=3.5, min_value=0.0, max_value=50.0, step=0.5, format="%.2f", key="tasa_cer", label_visibility="collapsed")
+            tasa_cer = st.number_input("Tasa anual (%)", value=42.0, min_value=0.0, max_value=500.0, step=1.0, format="%.2f", key="tasa_cer", label_visibility="collapsed")
         
         with col_usd1:
             st.markdown('<p style="margin-bottom: 0.3rem;">FCI USD %</p>', unsafe_allow_html=True)
             pct_usd = st.number_input("Porcentaje (%)", value=40.0, min_value=0.0, max_value=100.0, step=5.0, format="%.1f", key="pct_usd", label_visibility="collapsed")
         with col_usd2:
             st.markdown('<p style="margin-bottom: 0.3rem;">FCI USD Tasa</p>', unsafe_allow_html=True)
-            tasa_usd = st.number_input("Tasa mensual (%)", value=0.5, min_value=0.0, max_value=50.0, step=0.5, format="%.2f", key="tasa_usd", label_visibility="collapsed")
+            tasa_usd = st.number_input("Tasa anual (%)", value=6.0, min_value=0.0, max_value=500.0, step=1.0, format="%.2f", key="tasa_usd", label_visibility="collapsed")
         
         # Validar que la suma de porcentajes sea 100%
         suma_pct = pct_pf + pct_cer + pct_usd
