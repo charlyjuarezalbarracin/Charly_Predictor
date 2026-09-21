@@ -1,61 +1,61 @@
 {
   "Tradicional": {
-    "premio": "3942754329",
+    "premio": "4021819700",
     "ganadores": "Vacante"
   },
   "Match": {
-    "premio": "1810654955",
+    "premio": "1889720326",
     "ganadores": "Vacante"
   },
   "Desquite": {
-    "premio": "2363595572",
+    "premio": "2441301097",
     "ganadores": "Vacante"
   },
   "SaleOSale": {
-    "premio": "51811920",
-    "ganadores": "15"
+    "premio": "51763266",
+    "ganadores": "19"
   },
   "Plus": {
     "vacante": null
   },
   "Meta": {
-    "sorteo": "3917",
-    "fecha": "2026-09-12",
-    "pozo_estimado": "24580000000",
-    "xml_url": "https://loto.loteriadelaciudad.gob.ar/export/descarga.php?sorteo=2026/09/LTO51X20260912.xml"
+    "sorteo": "3919",
+    "fecha": "2026-09-19",
+    "pozo_estimado": "25301000000",
+    "xml_url": "https://loto.loteriadelaciudad.gob.ar/export/descarga.php?sorteo=2026/09/LTO51X20260919.xml"
   },
   "Resultados": {
     "Tradicional": [
-      23,
-      1,
-      15,
-      41,
-      43,
-      21
+      24,
+      17,
+      6,
+      12,
+      20,
+      29
     ],
     "Match": [
-      6,
-      16,
       21,
-      32,
-      12,
-      2
+      30,
+      24,
+      4,
+      8,
+      16
     ],
     "Desquite": [
-      22,
-      16,
-      0,
-      5,
-      43,
-      1
+      8,
+      26,
+      31,
+      2,
+      41,
+      44
     ],
     "SaleOSale": [
-      17,
-      7,
-      3,
-      19,
+      2,
       12,
-      0
+      9,
+      28,
+      17,
+      36
     ],
     "Plus": null
   }
