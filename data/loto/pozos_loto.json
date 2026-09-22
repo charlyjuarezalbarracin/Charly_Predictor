@@ -1,0 +1,62 @@
+{
+  "Tradicional": {
+    "premio": "4021819700",
+    "ganadores": "Vacante"
+  },
+  "Match": {
+    "premio": "1889720326",
+    "ganadores": "Vacante"
+  },
+  "Desquite": {
+    "premio": "2441301097",
+    "ganadores": "Vacante"
+  },
+  "SaleOSale": {
+    "premio": "51763266",
+    "ganadores": "19"
+  },
+  "Plus": {
+    "vacante": null
+  },
+  "Meta": {
+    "sorteo": "3919",
+    "fecha": "2026-09-19",
+    "pozo_estimado": "25301000000",
+    "xml_url": "https://loto.loteriadelaciudad.gob.ar/export/descarga.php?sorteo=2026/09/LTO51X20260919.xml"
+  },
+  "Resultados": {
+    "Tradicional": [
+      24,
+      17,
+      6,
+      12,
+      20,
+      29
+    ],
+    "Match": [
+      21,
+      30,
+      24,
+      4,
+      8,
+      16
+    ],
+    "Desquite": [
+      8,
+      26,
+      31,
+      2,
+      41,
+      44
+    ],
+    "SaleOSale": [
+      2,
+      12,
+      9,
+      28,
+      17,
+      36
+    ],
+    "Plus": null
+  }
+}

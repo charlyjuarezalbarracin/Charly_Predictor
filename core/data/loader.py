@@ -16,6 +16,11 @@ class DataLoader:
     def __init__(self):
         self.data = None
         self.raw_data = None
+
+    @staticmethod
+    def _normalizar_numeros(numeros):
+        """Devuelve una tupla ordenada para que el DataFrame sea hashable en caché."""
+        return tuple(sorted(int(num) for num in numeros))
     
     def load_csv(self, filepath: str, date_column: str = 'fecha', 
                  numbers_columns: List[str] = None) -> pd.DataFrame:
@@ -52,7 +57,7 @@ class DataLoader:
                 sorteo = {
                     'sorteo_id': int(row.get('sorteo_id', idx + 1)),  # Usar sorteo_id del CSV si existe
                     'fecha': pd.to_datetime(row[date_column]),
-                    'numeros': sorted([int(row[col]) for col in numbers_columns])
+                    'numeros': self._normalizar_numeros([row[col] for col in numbers_columns])
                 }
                 processed_data.append(sorteo)
             
@@ -101,7 +106,7 @@ class DataLoader:
                 sorteo = {
                     'sorteo_id': item.get('sorteo_id', len(processed_data) + 1),
                     'fecha': pd.to_datetime(item['fecha']),
-                    'numeros': sorted(item['numeros'])
+                    'numeros': self._normalizar_numeros(item['numeros'])
                 }
                 processed_data.append(sorteo)
             
@@ -131,7 +136,7 @@ class DataLoader:
             processed = {
                 'sorteo_id': sorteo.get('sorteo_id', idx + 1),
                 'fecha': pd.to_datetime(sorteo.get('fecha', datetime.now())),
-                'numeros': sorted(sorteo['numeros'])
+                'numeros': self._normalizar_numeros(sorteo['numeros'])
             }
             processed_data.append(processed)
         

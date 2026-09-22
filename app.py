@@ -1,4 +1,4 @@
-"""
+﻿"""
 ================================================================================
   CHARLY PREDICTOR - INTERFAZ GRÁFICA WEB
   Sistema de Predicción de Quini 6
@@ -6,6 +6,7 @@
 """
 
 import streamlit as st
+import streamlit.components.v1 as components
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
@@ -16,12 +17,13 @@ from pathlib import Path
 # Importaciones del core
 from core.data import DataLoader
 from core.analysis import FrequencyAnalyzer, CorrelationAnalyzer, PatternAnalyzer
-from core.scoring import UnifiedScorer
+from core.scoring import UnifiedScorer, WeightManager
 from core.generator import StrategyManager, GenerationStrategy, PortfolioGenerator
 from core.generator.optimizer import CombinationOptimizer
 from core.backtesting import WalkForwardBacktester
 from utils.data_generator import generate_sample_data
 from varios.scraper_quiniya_final import actualizar_historico_csv, obtener_pozos_ultimo_sorteo
+from varios.scraper_loto import actualizar_historico_loto_csv, obtener_pozos_loto
 
 # Importar configuración optimizada
 try:
@@ -37,13 +39,14 @@ except ImportError:
     }
     OPTIMAL_STRATEGY = 'BOTH'
 
+weight_manager = WeightManager()
 
 # ============================================================================
 # CONFIGURACIÓN DE LA PÁGINA
 # ============================================================================
 
 st.set_page_config(
-    page_title="Charly Predictor - Quini 6",
+    page_title="Charly Predictor",
     page_icon="CP",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -79,9 +82,14 @@ st.markdown("""
         background-color: #f8f9fa;
     }
 
+    /* Ocultar el header nativo de Streamlit para eliminar el espacio en blanco superior */
+    [data-testid="stHeader"] {
+        display: none;
+    }
+
     /* Reducir padding vertical general del contenedor principal */
     section[data-testid="stMain"] .block-container {
-        padding-top: 0.6rem;
+        padding-top: 0 !important;
         padding-bottom: 1rem;
     }
 
@@ -89,90 +97,92 @@ st.markdown("""
     .app-banner,
     .sidebar-banner {
         text-align: center;
-        padding: 16px 14px;
-        background: linear-gradient(135deg, #F2A100 0%, #E58E00 100%);
-        border-radius: 0;
-        margin: -1rem -1rem 0.9rem -1rem;
+        padding: 20px 16px;
+        background: linear-gradient(135deg, #1B2A4A 0%, #0F1B33 100%);
+        border-radius: 0 0 20px 20px;
+        margin: -1rem -1rem 1rem -1rem;
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        min-height: 112px;
+        min-height: 108px;
         position: relative;
+        box-shadow: 0 4px 14px rgba(27, 42, 74, 0.25);
     }
 
     .app-banner {
-        min-height: 120px;
-        padding-top: 60px;
-        padding-bottom: 10px;
+        min-height: 108px;
+        padding-top: 22px;
+        padding-bottom: 16px;
     }
 
     .banner-logo {
         background: white;
-        width: 38px;
-        height: 38px;
+        width: 36px;
+        height: 36px;
         border-radius: 11px;
-        margin: 0 auto 10px auto;
+        margin: 0 auto 8px auto;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 20px;
-        color: #F2A100;
+        font-size: 15px;
+        color: #2EC4B6;
         font-weight: 700;
+        letter-spacing: 0.5px;
         box-shadow: 0 3px 10px rgba(0,0,0,0.12);
     }
 
     .banner-title {
         color: white;
         margin: 0;
-        font-size: 20px;
+        font-size: 19px;
         font-weight: 700;
-        letter-spacing: 0.5px;
+        letter-spacing: 0.3px;
     }
 
     .banner-subtitle {
-        color: rgba(255,255,255,0.95);
-        margin: 6px 0 0 0;
-        font-size: 12px;
-        font-weight: 400;
+        display: inline-block;
+        color: white;
+        margin: 8px 0 0 0;
+        padding: 3px 12px;
+        background-color: rgba(255,255,255,0.18);
+        border-radius: 50px;
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.6px;
+        text-transform: uppercase;
     }
 
     .banner-fecha {
         position: absolute;
-        right: 20px;
-        bottom: 18px;
-        color: rgba(255,255,255,0.85);
-        font-size: 11px;
+        right: 18px;
+        bottom: 14px;
+        color: rgba(255,255,255,0.8);
+        font-size: 10.5px;
         font-weight: 400;
     }
 
-    /* Tamaños especificos por panel */
-    .app-banner .banner-title {
-        font-size: 22px !important;
-    }
-
-    .app-banner .banner-subtitle {
-        font-size: 18px !important;
-    }
-
+    /* Tamaños unificados: header y sidebar comparten la misma jerarquía */
+    .app-banner .banner-title,
     .sidebar-banner .banner-title {
-        font-size: 20px !important;
+        font-size: 19px !important;
     }
 
+    .app-banner .banner-subtitle,
     .sidebar-banner .banner-subtitle {
-        font-size: 12px !important;
+        font-size: 11px !important;
     }
     
-    /* Tarjetas de números predichos - Estilo Midasmind */
+    /* Tarjetas de números predichos - Estilo Charly */
     .numero-predicho {
-        background: linear-gradient(135deg, #F2A100 0%, #E58E00 100%);
+        background: linear-gradient(135deg, #2EC4B6 0%, #22A99C 100%);
         color: white;
         padding: 16px 12px;
         border-radius: 20px;
         text-align: center;
         font-size: 24px;
         font-weight: 700;
-        box-shadow: 0 2px 8px rgba(242, 161, 0, 0.3);
+        box-shadow: 0 2px 8px rgba(46, 196, 182, 0.3);
         margin: 0;
         border: none;
         width: 95px;
@@ -193,50 +203,63 @@ st.markdown("""
         padding: 16px 20px;
         border-radius: 20px;
         box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-        border-left: 4px solid #F2A100;
+        border-left: 4px solid #2EC4B6;
     }
     
     /* Tarjetas en sidebar */
     [data-testid="stSidebar"] .stat-card {
-        border-left-color: #F2A100;
+        border-left-color: #2EC4B6;
     }
     
-    /* Botones estilo Píldora Midasmind */
+    /* Botones secundarios - estilo píldora compacta (acción por defecto) */
     .stButton>button {
-        background: white;
-        color: #333333;
+        background: rgba(46, 196, 182, 0.08);
+        color: #1B2A4A;
         border-radius: 50px;
-        padding: 12px 24px;
-        border: 2px solid #F2A100;
+        padding: 9px 20px;
+        border: 1.5px solid #2EC4B6;
         font-weight: 600;
-        font-size: 15px;
-        transition: all 0.3s;
-        box-shadow: 0 2px 6px rgba(242, 161, 0, 0.15);
+        font-size: 0.85rem;
+        transition: all 0.2s;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
     }
     
     .stButton>button:hover {
-        background: #F2A100;
+        border-color: #22A99C;
+        color: #22A99C;
+        background: rgba(46, 196, 182, 0.18);
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    /* Botón primario - única acción destacada por pantalla (ej. Generar Predicción) */
+    .stButton>button[kind="primary"] {
+        background: linear-gradient(135deg, #2EC4B6 0%, #22A99C 100%);
         color: white;
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(242, 161, 0, 0.3);
+        border: none;
+        padding: 8px 18px;
+        font-weight: 700;
+        font-size: 0.85rem;
+        letter-spacing: 0.3px;
+        box-shadow: 0 2px 6px rgba(46, 196, 182, 0.35);
+    }
+
+    .stButton>button[kind="primary"]:hover {
+        background: linear-gradient(135deg, #22A99C 0%, #2EC4B6 100%);
+        color: white;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 10px rgba(46, 196, 182, 0.45);
     }
     
-    .stButton>button::after {
-        content: " ›";
-        margin-left: 8px;
-        font-size: 18px;
-    }
-    
-    /* Headers - Estilo limpio Midasmind */
+    /* Headers - Estilo limpio Charly */
     h1 {
-        color: #333333 !important;
+        color: #1B2A4A !important;
         font-size: 2.2rem !important;
         margin-bottom: 0.5rem !important;
         font-weight: 700 !important;
     }
     
     h2 {
-        color: #333333 !important;
+        color: #1B2A4A !important;
         font-size: 1.5rem !important;
         margin-top: 0.8rem !important;
         margin-bottom: 0.5rem !important;
@@ -244,7 +267,7 @@ st.markdown("""
     }
     
     h3 {
-        color: #F2A100 !important;
+        color: #2EC4B6 !important;
         font-size: 1.1rem !important;
         margin-top: 0.5rem !important;
         margin-bottom: 0.2rem !important;
@@ -256,6 +279,8 @@ st.markdown("""
         color: #666666 !important;
         font-size: 0.95rem !important;
         font-weight: 500 !important;
+        margin-top: 0.6rem !important;
+        margin-bottom: 0.2rem !important;
     }
     
     /* Texto general */
@@ -265,10 +290,10 @@ st.markdown("""
         line-height: 1.6;
     }
     
-    /* Métricas - Estilo Midasmind */
+    /* Métricas - Estilo Charly */
     [data-testid="stMetricValue"] {
         font-size: 28px !important;
-        color: #F2A100 !important;
+        color: #2EC4B6 !important;
         font-weight: 700 !important;
     }
     
@@ -279,22 +304,22 @@ st.markdown("""
         letter-spacing: 0.5px;
     }
     
-    /* Sidebar - Estilo Midasmind */
+    /* Sidebar - Estilo Charly (azul marino oscuro) */
     [data-testid="stSidebar"] {
-        background-color: white !important;
+        background-color: #1B2A4A !important;
         border-radius: 0 30px 30px 0 !important;
         margin: 0 !important;
-        box-shadow: 4px 0 20px rgba(0,0,0,0.08);
+        box-shadow: 4px 0 20px rgba(0,0,0,0.15);
     }
     
     [data-testid="stSidebar"] > div:first-child {
-        background-color: white !important;
+        background-color: #1B2A4A !important;
         border-radius: 0 30px 30px 0 !important;
     }
     
     /* Botón de colapsar sidebar */
     [data-testid="collapsedControl"] {
-        background-color: #F2A100 !important;
+        background-color: #1B2A4A !important;
         border-radius: 0 15px 15px 0 !important;
     }
     
@@ -302,122 +327,131 @@ st.markdown("""
         color: white !important;
     }
     
-    /* Sidebar headers */
+    /* Sidebar headers - etiquetas de sección uniformes tipo tag */
     [data-testid="stSidebar"] h1 {
-        font-size: 1.3rem !important;
-        color: #333333 !important;
+        font-size: 1.15rem !important;
+        color: #FFFFFF !important;
         font-weight: 700 !important;
     }
     
-    [data-testid="stSidebar"] h2 {
-        font-size: 1.1rem !important;
-        color: #F2A100 !important;
-        font-weight: 600 !important;
-        margin-top: 0.6rem !important;
+    [data-testid="stSidebar"] h2,
+    [data-testid="stSidebar"] h3,
+    [data-testid="stSidebar"] h4,
+    [data-testid="stSidebar"] h5,
+    [data-testid="stSidebar"] h6 {
+        font-size: 0.75rem !important;
+        color: #8B96AC !important;
+        font-weight: 700 !important;
+        text-transform: uppercase;
+        letter-spacing: 0.6px;
+        margin-top: 1rem !important;
+        margin-bottom: 0.4rem !important;
     }
     
-    [data-testid="stSidebar"] h3 {
-        font-size: 1rem !important;
-        color: #333333 !important;
-        font-weight: 600 !important;
-    }
-    
-    /* Sidebar labels y texto */
-    [data-testid="stSidebar"] label {
-        color: #666666 !important;
-        font-weight: 500 !important;
-        font-size: 0.9rem !important;
-    }
-    
+    /* Sidebar labels y texto - mismo tamaño para todo el texto general */
+    [data-testid="stSidebar"] label,
     [data-testid="stSidebar"] p {
-        color: #666666 !important;
+        color: #C9D3E0 !important;
+        font-weight: 500 !important;
+        font-size: 0.72rem !important;
+    }
+    
+    /* Sidebar - texto general suelto (captions, spinner, markdown sin etiqueta) */
+    [data-testid="stSidebar"] [data-testid="stMarkdownContainer"],
+    [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] div,
+    [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] span,
+    [data-testid="stSidebar"] [data-testid="stCaptionContainer"],
+    [data-testid="stSidebar"] [data-testid="stSpinner"] {
+        color: #C9D3E0;
     }
     
     /* Sidebar divisores */
     [data-testid="stSidebar"] hr {
         margin: 0.5rem 0 !important;
         border: none !important;
-        border-top: 1px solid #f0f0f0 !important;
+        border-top: 1px solid rgba(255,255,255,0.12) !important;
     }
     
     /* Sidebar - Botones estilo Píldora */
     [data-testid="stSidebar"] .stButton>button {
-        background: white;
-        color: #333333;
+        background: rgba(46, 196, 182, 0.12);
+        color: #FFFFFF;
         border-radius: 50px;
-        padding: 8px 12px;
-        border: 2px solid #F2A100;
+        padding: 8px 14px;
+        border: 1.5px solid #2EC4B6;
         font-weight: 600;
-        font-size: 14px;
+        font-size: 0.85rem;
         transition: all 0.3s;
         width: 100%;
-        box-shadow: 0 2px 6px rgba(242, 161, 0, 0.12);
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
     }
     
     [data-testid="stSidebar"] .stButton>button:hover {
-        background: #F2A100;
-        color: white;
+        background: #2EC4B6;
+        color: #0F1B33;
         transform: translateY(-1px);
-        box-shadow: 0 4px 12px rgba(242, 161, 0, 0.25);
+        box-shadow: 0 4px 12px rgba(46, 196, 182, 0.35);
     }
     
-    [data-testid="stSidebar"] .stButton>button::after {
-        content: " ›";
-        margin-left: 8px;
-        font-size: 16px;
-    }
-    
-    /* Sidebar - Radio buttons estilo limpio */
+    /* Sidebar - Radio buttons estilo chip uniforme */
     [data-testid="stSidebar"] [data-baseweb="radio"] > div {
-        gap: 0.35rem;
+        gap: 0.4rem;
     }
     
     [data-testid="stSidebar"] [data-baseweb="radio"] label {
-        padding: 6px 10px;
+        padding: 7px 14px;
         border-radius: 50px;
         transition: all 0.2s;
-        border: 1px solid transparent;
+        border: 1.5px solid rgba(255,255,255,0.15);
+        background-color: transparent;
     }
     
     [data-testid="stSidebar"] [data-baseweb="radio"] label:hover {
-        background-color: rgba(242, 161, 0, 0.08);
-        border-color: #F2A100;
+        background-color: rgba(46, 196, 182, 0.15);
+        border-color: #2EC4B6;
+    }
+
+    [data-testid="stSidebar"] [data-baseweb="radio"] label,
+    [data-testid="stSidebar"] [data-baseweb="radio"] label p,
+    [data-testid="stSidebar"] [data-baseweb="radio"] label span,
+    [data-testid="stSidebar"] [data-baseweb="radio"] label div {
+        font-size: 0.72rem !important;
     }
     
-    /* Sidebar - Expander estilo Midasmind */
+    /* Sidebar - Expander estilo Charly */
     [data-testid="stSidebar"] .streamlit-expanderHeader {
-        background-color: rgba(242, 161, 0, 0.06);
+        background-color: rgba(46, 196, 182, 0.1);
         border-radius: 15px;
         font-weight: 600;
         padding: 6px 10px;
-        border: 1px solid rgba(242, 161, 0, 0.2);
+        border: 1px solid rgba(46, 196, 182, 0.3);
     }
     
     [data-testid="stSidebar"] .streamlit-expanderHeader:hover {
-        background-color: rgba(242, 161, 0, 0.12);
-        border-color: #F2A100;
+        background-color: rgba(46, 196, 182, 0.18);
+        border-color: #2EC4B6;
     }
     
-    /* Sidebar - Sliders con color dorado */
+    /* Sidebar - Sliders con color teal */
     [data-testid="stSidebar"] .stSlider > div > div > div {
-        background-color: #F2A100;
+        background-color: #2EC4B6;
     }
     
     /* Mensajes de info/success/warning */
     [data-testid="stSidebar"] .stAlert {
         padding: 6px 10px;
         border-radius: 15px;
-        font-size: 0.75rem;
+        font-size: 0.72rem;
         border: none;
     }
 
     [data-testid="stSidebar"] .stAlert p {
-        font-size: 0.75rem !important;
+        font-size: 0.72rem !important;
     }
 
     /* Sidebar - Compactar contenedores */
     [data-testid="stSidebar"] .block-container {
-        padding-top: 0.6rem;
+        padding-top: 0 !important;
         padding-bottom: 0.6rem;
     }
 
@@ -425,7 +459,7 @@ st.markdown("""
         margin-bottom: 0.35rem !important;
     }
     
-    /* Tabs - Estilo Píldora Midasmind */
+    /* Tabs - Estilo Píldora Charly */
     .stTabs [data-baseweb="tab-list"] {
         background-color: transparent;
         gap: 0.8rem;
@@ -438,20 +472,23 @@ st.markdown("""
         font-weight: 600;
         padding: 0.8rem 1.5rem;
         border-radius: 50px;
-        border: 2px solid transparent;
-        background-color: white;
+        border: 1.5px solid #2EC4B6;
+        background-color: rgba(46, 196, 182, 0.08);
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
         transition: all 0.3s;
     }
     
     .stTabs [data-baseweb="tab"]:hover {
-        border-color: #F2A100;
-        color: #F2A100;
+        border-color: #22A99C;
+        color: #22A99C;
+        background-color: rgba(46, 196, 182, 0.18);
     }
     
     .stTabs [data-baseweb="tab"][aria-selected="true"] {
-        background-color: #F2A100;
+        background-color: #2EC4B6;
         color: white;
-        border-color: #F2A100;
+        border-color: #2EC4B6;
+        box-shadow: 0 2px 6px rgba(46, 196, 182, 0.35);
     }
     
     /* Dataframes y tablas */
@@ -500,7 +537,7 @@ st.markdown("""
         box-shadow: none !important;
     }
     
-    /* Inputs y selectbox estilo Midasmind */
+    /* Inputs y selectbox estilo Charly */
     input, select, textarea {
         border-radius: 50px !important;
         border: 2px solid #e0e0e0 !important;
@@ -508,8 +545,8 @@ st.markdown("""
     }
     
     input:focus, select:focus, textarea:focus {
-        border-color: #F2A100 !important;
-        box-shadow: 0 0 0 3px rgba(242, 161, 0, 0.1) !important;
+        border-color: #2EC4B6 !important;
+        box-shadow: 0 0 0 3px rgba(46, 196, 182, 0.15) !important;
     }
     
     /* Mensajes Success/Info/Warning - Estilo Midasmind con mayor especificidad */
@@ -518,11 +555,11 @@ st.markdown("""
     [data-testid="stNotification"], 
     div[data-baseweb="notification"],
     .stAlertContainer {
-        border-radius: 20px !important;
-        padding: 10px 16px !important;
-        border-width: 2px !important;
+        border-radius: 10px !important;
+        padding: 7px 14px !important;
+        border-width: 1.5px !important;
         border-style: solid !important;
-        font-size: 0.9rem !important;
+        font-size: 0.82rem !important;
         font-weight: 500 !important;
         min-height: auto !important;
     }
@@ -542,19 +579,19 @@ st.markdown("""
         color: #2E7D32 !important;
     }
     
-    /* Info - Dorado Midasmind */
+    /* Info - Teal Charly */
     [data-testid="stAlertContainer"][class*="info"],
     .stInfo,
     div[data-baseweb="notification"][kind="info"],
     [data-testid="stNotification"][kind="info"] {
-        background-color: rgba(242, 161, 0, 0.08) !important;
-        border-color: #F2A100 !important;
-        color: #E58E00 !important;
+        background-color: rgba(46, 196, 182, 0.1) !important;
+        border-color: #2EC4B6 !important;
+        color: #1F8377 !important;
     }
     
     [data-testid="stAlertContainer"][class*="info"] *,
     .stInfo * {
-        color: #E58E00 !important;
+        color: #1F8377 !important;
     }
     
     /* Warning - Naranja */
@@ -595,12 +632,12 @@ st.markdown("""
         background: transparent !important;
     }
     
-    /* Bloque de código estilo Midasmind */
+    /* Bloque de código estilo Charly */
     .stCodeBlock, 
     pre,
     [data-testid="stCode"] {
         border-radius: 15px !important;
-        border: 2px solid #F2A100 !important;
+        border: 2px solid #2EC4B6 !important;
         background-color: white !important;
         padding: 16px !important;
     }
@@ -644,12 +681,12 @@ st.markdown("""
     
     /* Info - sobrescribir TODO */
     div[data-testid="stAlertContainer"]:has([data-testid="stAlertContentInfo"]) {
-        background-color: rgba(242, 161, 0, 0.08) !important;
-        border: 2px solid #F2A100 !important;
+        background-color: rgba(46, 196, 182, 0.1) !important;
+        border: 2px solid #2EC4B6 !important;
     }
     
     div[data-testid="stAlertContainer"]:has([data-testid="stAlertContentInfo"]) * {
-        color: #E58E00 !important;
+        color: #1F8377 !important;
     }
     
     /* Warning - sobrescribir TODO */
@@ -724,8 +761,8 @@ st.markdown("""
     }
 
     .pozo-card {
-        background: linear-gradient(135deg, rgba(242, 161, 0, 0.08) 0%, rgba(229, 142, 0, 0.08) 100%);
-        border: 2px solid #F2A100;
+        background: linear-gradient(135deg, rgba(46, 196, 182, 0.08) 0%, rgba(34, 169, 156, 0.08) 100%);
+        border: 2px solid #2EC4B6;
         border-radius: 12px;
         padding: 12px;
         text-align: center;
@@ -740,7 +777,7 @@ st.markdown("""
     }
 
     .pozo-valor {
-        color: #F2A100;
+        color: #2EC4B6;
         font-size: 1.1rem;
         font-weight: 700;
     }
@@ -776,6 +813,13 @@ st.markdown("""
     [data-testid="stExpander"] summary {
         font-size: 0.85rem !important;
         font-weight: 500 !important;
+    }
+
+    /* Sidebar - mismo tamaño de texto general para checkbox, slider y expander (mayor especificidad que las reglas globales de arriba) */
+    [data-testid="stSidebar"] .stCheckbox label,
+    [data-testid="stSidebar"] .stSlider label,
+    [data-testid="stSidebar"] [data-testid="stExpander"] summary {
+        font-size: 0.72rem !important;
     }
     
     /* Deshabilitar input de búsqueda en selectbox - solo selección con mouse/teclado */
@@ -839,7 +883,39 @@ st.markdown("""
 
 HISTORIAL_FILE = Path('data/historial_predicciones.json')
 POZOS_FILE = Path('data/pozos_actuales.json')
+POZOS_LOTO_FILE = Path('data/loto/pozos_loto.json')
 GASTOS_FILE = Path('data/gastos_inversiones.json')
+
+GAME_CONFIGS = {
+    'quini6': {
+        'nombre': 'Quini 6',
+        'csv_path': 'data/quini6_historico.csv',
+        'usa_pozos': True,
+        'max_number': 45,
+        'numbers_per_draw': 6,
+        'dias_sorteo': [2, 6],
+        'modalidades': ['Tradicional', 'Segunda', 'Revancha', 'Siempre Sale'],
+    },
+    'loto': {
+        'nombre': 'Loto',
+        'csv_path': 'data/loto/loto_historico.csv',
+        'usa_pozos': True,
+        'max_number': 45,
+        'numbers_per_draw': 6,
+        'dias_sorteo': [2, 5],
+        'modalidades': ['Loto Tradicional', 'Loto Match', 'Loto Desquite', 'Loto Sale o Sale'],
+    },
+}
+
+GAME_LABEL_TO_KEY = {
+    'Quini 6': 'quini6',
+    'Loto': 'loto',
+}
+
+
+def obtener_config_juego(juego: str = None):
+    juego_key = juego or st.session_state.get('juego_actual', 'quini6')
+    return GAME_CONFIGS.get(juego_key, GAME_CONFIGS['quini6'])
 
 def convertir_a_serializable(obj):
     """Convertir tipos numpy a tipos nativos de Python para JSON"""
@@ -890,11 +966,11 @@ def calcular_inversion_portfolio(capital_inicial, pct_pf, tasa_pf, pct_fci_cer, 
     Args:
         capital_inicial: Capital total a invertir
         pct_pf: Porcentaje en plazo fijo (0-100)
-        tasa_pf: Tasa mensual plazo fijo (%)
+        tasa_pf: Tasa anual plazo fijo (%)
         pct_fci_cer: Porcentaje en FCI CER (0-100)
-        tasa_fci_cer: Tasa mensual FCI CER (%)
+        tasa_fci_cer: Tasa anual FCI CER (%)
         pct_fci_usd: Porcentaje en FCI USD (0-100)
-        tasa_fci_usd: Tasa mensual FCI USD (%)
+        tasa_fci_usd: Tasa anual FCI USD (%)
         inflacion_mensual: Inflación mensual (%)
         meses: Número de meses a proyectar
         gastos_iniciales: Dict con {mes: monto} de gastos editables desde grilla
@@ -932,10 +1008,15 @@ def calcular_inversion_portfolio(capital_inicial, pct_pf, tasa_pf, pct_fci_cer, 
         # Capital total al inicio del mes
         acumulado = capital_pf + capital_cer + capital_usd
         
+        # Las tasas se ingresan como anuales y se convierten a tasa mensual equivalente
+        tasa_pf_mensual = (tasa_pf / 100) / 12
+        tasa_cer_mensual = (tasa_fci_cer / 100) / 12
+        tasa_usd_mensual = (tasa_fci_usd / 100) / 12
+        
         # Rentabilidad de cada activo
-        rent_pf = capital_pf * (tasa_pf / 100)
-        rent_cer = capital_cer * (tasa_fci_cer / 100)
-        rent_usd = capital_usd * (tasa_fci_usd / 100)
+        rent_pf = capital_pf * tasa_pf_mensual
+        rent_cer = capital_cer * tasa_cer_mensual
+        rent_usd = capital_usd * tasa_usd_mensual
         
         rentabilidad_total = rent_pf + rent_cer + rent_usd
         
@@ -1057,7 +1138,7 @@ def calcular_inversiones(premio, base, tna, meses=12, gastos_iniciales=None):
     return pd.DataFrame(resultados)
 
 def guardar_pozos_json(pozos):
-    """Guardar pozos en archivo JSON"""
+    """Guardar pozos de Quini6 en archivo JSON"""
     try:
         POZOS_FILE.parent.mkdir(parents=True, exist_ok=True)
         with open(POZOS_FILE, 'w', encoding='utf-8') as f:
@@ -1066,7 +1147,7 @@ def guardar_pozos_json(pozos):
         print(f"No se pudo guardar pozos: {str(e)}")
 
 def cargar_pozos_json():
-    """Cargar pozos desde archivo JSON"""
+    """Cargar pozos de Quini6 desde archivo JSON"""
     try:
         if POZOS_FILE.exists():
             with open(POZOS_FILE, 'r', encoding='utf-8') as f:
@@ -1074,6 +1155,67 @@ def cargar_pozos_json():
         return None
     except Exception as e:
         print(f"No se pudo cargar pozos: {str(e)}")
+        return None
+
+
+def guardar_pozos_loto_json(pozos):
+    """Guardar pozos de Loto en archivo JSON (separado de Quini6)"""
+    try:
+        POZOS_LOTO_FILE.parent.mkdir(parents=True, exist_ok=True)
+        with open(POZOS_LOTO_FILE, 'w', encoding='utf-8') as f:
+            json.dump(pozos, f, indent=2, ensure_ascii=False)
+    except Exception as e:
+        print(f"No se pudo guardar pozos Loto: {str(e)}")
+
+
+def _sanear_importes_pozos_loto(pozos):
+    """Corrige importes de Loto inflados x100 por parseo histórico de decimales XML."""
+    if not isinstance(pozos, dict):
+        return pozos, False
+
+    modalidades = ['Tradicional', 'Match', 'Desquite', 'SaleOSale']
+    premios = []
+    for mod in modalidades:
+        data = pozos.get(mod)
+        if not isinstance(data, dict):
+            continue
+        premio = data.get('premio')
+        try:
+            premios.append((mod, int(premio)))
+        except Exception:
+            continue
+
+    if len(premios) < 3:
+        return pozos, False
+
+    # Patrón observado del bug: varios pozos quedan x100 (dos decimales anexados).
+    # Señal robusta: al menos 2 modalidades por encima de 10 mil millones.
+    altos = sum(1 for _, v in premios if v >= 10_000_000_000)
+    if altos < 2:
+        return pozos, False
+
+    pozos_fix = dict(pozos)
+    for mod, valor in premios:
+        data = dict(pozos_fix.get(mod, {}))
+        data['premio'] = str(valor // 100)
+        pozos_fix[mod] = data
+
+    return pozos_fix, True
+
+def cargar_pozos_loto_json():
+    """Cargar pozos de Loto desde archivo JSON (separado de Quini6)"""
+    try:
+        if POZOS_LOTO_FILE.exists():
+            with open(POZOS_LOTO_FILE, 'r', encoding='utf-8') as f:
+                pozos = json.load(f)
+
+            pozos_saneados, cambiado = _sanear_importes_pozos_loto(pozos)
+            if cambiado:
+                guardar_pozos_loto_json(pozos_saneados)
+            return pozos_saneados
+        return None
+    except Exception as e:
+        print(f"No se pudo cargar pozos Loto: {str(e)}")
         return None
 
 def guardar_gastos_json(gastos):
@@ -1100,10 +1242,11 @@ def cargar_gastos_json():
         print(f"No se pudo cargar gastos: {str(e)}")
         return None
 
-def obtener_ultima_fecha_csv():
+def obtener_ultima_fecha_csv(juego='quini6'):
     """Obtener la última fecha del archivo CSV"""
     try:
-        csv_path = Path('data/quini6_historico.csv')
+        config_juego = obtener_config_juego(juego)
+        csv_path = Path(config_juego['csv_path'])
         if csv_path.exists():
             df = pd.read_csv(csv_path)
             if 'fecha' in df.columns and len(df) > 0:
@@ -1131,6 +1274,12 @@ def formatear_pozo(data):
         if premio:
             try:
                 numero = int(premio)
+
+                # Salvaguarda para Loto: algunas versiones previas guardaron
+                # montos del XML inflados x100 al concatenar decimales.
+                if st.session_state.get('juego_actual') == 'loto' and numero >= 100_000_000_000:
+                    numero = numero // 100
+
                 premio_formateado = f"{numero:,}".replace(',', '.')
                 
                 # Formatear ganadores: si es un número, agregar "Ganadores"
@@ -1155,7 +1304,7 @@ def formatear_pozo(data):
     except:
         return data, ''
 
-def obtener_fechas_validas(data):
+def obtener_fechas_validas(data, juego='quini6'):
     """
     Obtiene las fechas válidas (miércoles y domingos) del dataset ordenadas de más reciente a más antigua
     
@@ -1169,17 +1318,22 @@ def obtener_fechas_validas(data):
     fechas_unicas = pd.to_datetime(data['fecha']).dt.date.unique()
     fechas_ordenadas = sorted(fechas_unicas, reverse=True)
     
-    # Filtrar solo miércoles (2) y domingos (6)
+    config_juego = obtener_config_juego(juego)
+    dias_sorteo = config_juego.get('dias_sorteo', [])
+    if not dias_sorteo:
+        return fechas_ordenadas
+
+    # Filtrar días válidos según juego
     fechas_validas = []
     for fecha in fechas_ordenadas:
         dia_semana = pd.Timestamp(fecha).dayofweek
-        if dia_semana in [2, 6]:  # 2=miércoles, 6=domingo
+        if dia_semana in dias_sorteo:
             fechas_validas.append(fecha)
     
     return fechas_validas
 
 
-def controlar_boleta(numeros_jugados, data, fecha_seleccionada=None):
+def controlar_boleta(numeros_jugados, data, fecha_seleccionada=None, juego='quini6'):
     """
     Controla una jugada de 6 números contra los 4 sorteos de una fecha específica
     
@@ -1204,11 +1358,11 @@ def controlar_boleta(numeros_jugados, data, fecha_seleccionada=None):
     # Filtrar sorteos de la fecha y ordenar por sorteo_id para mantener orden correcto
     sorteos_fecha = data[data['fecha'] == fecha_control].sort_values('sorteo_id')
     
-    if len(sorteos_fecha) != 4:
+    config_juego = obtener_config_juego(juego)
+    modalidades = config_juego.get('modalidades', ['Tradicional', 'Segunda', 'Revancha', 'Siempre Sale'])
+
+    if len(sorteos_fecha) != len(modalidades):
         return None
-    
-    # Nombres de las modalidades en orden (según el orden del CSV)
-    modalidades = ['Tradicional', 'Segunda', 'Revancha', 'Siempre Sale']
     
     resultados = []
     for idx, (_, sorteo) in enumerate(sorteos_fecha.iterrows()):
@@ -1229,6 +1383,218 @@ def controlar_boleta(numeros_jugados, data, fecha_seleccionada=None):
         })
     
     return resultados
+
+
+def cargar_resultados_reales_historial(juego='quini6'):
+    """Carga sorteos reales desde CSV para evaluar aciertos del historial."""
+    config_juego = obtener_config_juego(juego)
+    csv_path = config_juego['csv_path']
+
+    df = pd.read_csv(csv_path)
+    if df.empty:
+        return pd.DataFrame(columns=['fecha', 'modalidad', 'numeros_real', 'numero_plus_real'])
+
+    df['fecha'] = pd.to_datetime(df['fecha']).dt.date
+
+    if 'sorteo_id' not in df.columns:
+        df['sorteo_id'] = range(1, len(df) + 1)
+
+    df = df.sort_values(['fecha', 'sorteo_id']).reset_index(drop=True)
+
+    num_cols = ['num1', 'num2', 'num3', 'num4', 'num5', 'num6']
+    df['numeros_real'] = df.apply(
+        lambda row: tuple(sorted([int(row[c]) for c in num_cols])),
+        axis=1
+    )
+
+    if juego == 'quini6':
+        modalidades = config_juego.get('modalidades', ['Tradicional', 'Segunda', 'Revancha', 'Siempre Sale'])
+        df['modalidad_idx'] = df.groupby('fecha').cumcount()
+        df['modalidad'] = df['modalidad_idx'].apply(
+            lambda idx: modalidades[idx] if idx < len(modalidades) else f"Sorteo {idx + 1}"
+        )
+        df['numero_plus_real'] = pd.NA
+    else:
+        if 'modalidad' not in df.columns:
+            modalidades = config_juego.get('modalidades', ['Loto Tradicional', 'Loto Match', 'Loto Desquite', 'Loto Sale o Sale'])
+            df['modalidad_idx'] = df.groupby('fecha').cumcount()
+            df['modalidad'] = df['modalidad_idx'].apply(
+                lambda idx: modalidades[idx] if idx < len(modalidades) else f"Sorteo {idx + 1}"
+            )
+        if 'numero_plus' in df.columns:
+            df['numero_plus_real'] = pd.to_numeric(df['numero_plus'], errors='coerce')
+        else:
+            df['numero_plus_real'] = pd.NA
+
+    return df[['fecha', 'modalidad', 'numeros_real', 'numero_plus_real']].copy()
+
+
+def inferir_juego_historial(juego_nombre):
+    """Mapea nombre del juego guardado en historial a clave interna."""
+    nombre = str(juego_nombre).strip().lower()
+    if 'loto' in nombre:
+        return 'loto'
+    return 'quini6'
+
+
+def extraer_fecha_historial(timestamp):
+    """Normaliza la fecha guardada en cada entrada del historial."""
+    if not timestamp:
+        return ''
+
+    try:
+        if isinstance(timestamp, str):
+            if ' ' in timestamp:
+                return timestamp.split(' ')[0]
+            return timestamp
+        return str(timestamp).split(' ')[0]
+    except Exception:
+        return str(timestamp).split(' ')[0] if isinstance(timestamp, str) else ''
+
+
+def orden_metodo_historial(metodo):
+    """Define el orden visual de los métodos dentro de una misma fecha."""
+    nombre = str(metodo or '').lower()
+    if 'estándar' in nombre or 'standard' in nombre:
+        return 0
+    if 'condicional' in nombre or 'conditional' in nombre:
+        return 1
+    if 'análisis rápido' in nombre or 'analisis rapido' in nombre or 'rápido' in nombre or 'rapido' in nombre:
+        return 2
+    return 99
+
+
+def normalizar_metodo_base(metodo):
+    """Reduce el nombre del método (con sufijos como '+ Optimizer') a su categoría base."""
+    nombre = str(metodo or '').lower()
+    if 'estándar' in nombre or 'standard' in nombre:
+        return 'Estándar'
+    if 'condicional' in nombre or 'conditional' in nombre:
+        return 'Condicional'
+    if 'rápido' in nombre or 'rapido' in nombre:
+        return 'Rápido'
+    return str(metodo or 'Otro')
+
+
+def calcular_mejor_metodo_historial():
+    """Calcula qué método base acierta más según el historial evaluado contra resultados reales."""
+    historial = st.session_state.get('historial', [])
+    if not historial:
+        return None
+
+    juego_actual = st.session_state.get('juego_actual', 'quini6')
+    historial_filtrado = [
+        e for e in historial
+        if inferir_juego_historial(e.get('juego', 'Quini 6')) == juego_actual
+    ]
+    if not historial_filtrado:
+        return None
+
+    try:
+        df_real = cargar_resultados_reales_historial(juego_actual)
+    except Exception:
+        return None
+    if df_real is None or df_real.empty:
+        return None
+
+    stats = {}  # metodo_base -> [aciertos, numeros_evaluados]
+    for entry in historial_filtrado:
+        evaluacion = evaluar_entry_historial_con_real(entry, df_real)
+        if not evaluacion or evaluacion.get('estado') != 'ok':
+            continue
+
+        metodo_base = normalizar_metodo_base(entry.get('metodo', ''))
+        for resultado in evaluacion.get('resultados_modalidad', []):
+            acumulado = stats.setdefault(metodo_base, [0, 0])
+            acumulado[0] += resultado.get('aciertos', 0)
+            acumulado[1] += 6
+
+    mejor = None
+    for metodo_base, (aciertos, total) in stats.items():
+        if total == 0:
+            continue
+        pct = (aciertos / total) * 100
+        if mejor is None or pct > mejor[1]:
+            mejor = (metodo_base, pct)
+
+    return mejor
+
+
+def agrupar_historial_por_fecha(historial):
+    """Agrupa entradas del historial por fecha, no por timestamp exacto."""
+    from collections import OrderedDict
+
+    grupos = OrderedDict()
+    for entry in historial:
+        fecha = extraer_fecha_historial(entry.get('timestamp', ''))
+        if not fecha:
+            fecha = 'Sin fecha'
+        grupos.setdefault(fecha, []).append(entry)
+
+    for fecha, entradas in grupos.items():
+        grupos[fecha] = sorted(entradas, key=lambda e: orden_metodo_historial(e.get('metodo', '')))
+
+    return grupos
+
+
+def evaluar_entry_historial_con_real(entry, df_real):
+    """Evalúa una predicción del historial contra los sorteos reales del mismo día."""
+    if df_real is None or df_real.empty:
+        return None
+
+    prediccion = entry.get('prediccion')
+    if not isinstance(prediccion, list) or len(prediccion) != 6:
+        return None
+
+    try:
+        fecha_pred = datetime.strptime(entry.get('timestamp', ''), "%Y-%m-%d %H:%M:%S").date()
+    except Exception:
+        fecha_pred = None
+
+    if fecha_pred is None:
+        return None
+
+    # Las predicciones se generan antes del próximo sorteo y el historial conserva la fecha de creación.
+    fechas_disponibles = sorted(df_real.loc[df_real['fecha'] >= fecha_pred, 'fecha'].unique())
+    fecha_real = fechas_disponibles[0] if fechas_disponibles else None
+    sorteos_fecha = df_real[df_real['fecha'] == fecha_real] if fecha_real is not None else df_real.iloc[0:0]
+    if sorteos_fecha.empty:
+        return {
+            'estado': 'pendiente',
+            'fecha_real': str(fecha_pred),
+        }
+
+    pred_set = set(int(n) for n in prediccion)
+    resultados_modalidad = []
+    for _, row in sorteos_fecha.iterrows():
+        numeros_real = row['numeros_real']
+        coincidencias = sorted(pred_set & set(numeros_real))
+        aciertos = len(coincidencias)
+        resultados_modalidad.append({
+            'modalidad': str(row['modalidad']),
+            'aciertos': int(aciertos),
+            'coincidencias': [int(n) for n in coincidencias]
+        })
+
+    if not resultados_modalidad:
+        return None
+
+    resultado = {
+        'estado': 'ok',
+        'fecha_real': str(fecha_real),
+        'resultados_modalidad': resultados_modalidad,
+    }
+
+    plus_pred = entry.get('numero_plus')
+    plus_real = sorteos_fecha['numero_plus_real'].iloc[0] if 'numero_plus_real' in sorteos_fecha.columns and len(sorteos_fecha) > 0 else pd.NA
+    if plus_pred is not None and pd.notna(plus_real):
+        resultado['plus_disponible'] = True
+        resultado['acierto_plus'] = int(int(plus_pred) == int(plus_real))
+        resultado['plus_real'] = int(plus_real)
+    else:
+        resultado['plus_disponible'] = False
+
+    return resultado
 
 
 def mostrar_bolillas(numeros_sorteo, numeros_acertados):
@@ -1266,25 +1632,34 @@ def init_session_state():
     if 'prediction_count' not in st.session_state:
         st.session_state.prediction_count = len(st.session_state.historial)
     if 'pozos_actuales' not in st.session_state:
-        # Cargar pozos desde JSON
+        # Cargar pozos Quini6 desde JSON
         st.session_state.pozos_actuales = cargar_pozos_json()
+    if 'pozos_loto' not in st.session_state:
+        # Cargar pozos Loto desde JSON (archivo separado)
+        st.session_state.pozos_loto = cargar_pozos_loto_json()
+    if 'juego_actual' not in st.session_state:
+        st.session_state.juego_actual = 'quini6'
     if 'ultima_fecha_csv' not in st.session_state:
-        st.session_state.ultima_fecha_csv = obtener_ultima_fecha_csv()
+        st.session_state.ultima_fecha_csv = obtener_ultima_fecha_csv(st.session_state.juego_actual)
 
 
-def agregar_al_historial(prediccion, metodo, scores_info):
-    """Agregar predicción al historial y guardar en JSON"""
+def agregar_al_historial(prediccion, metodo, scores_info, numero_plus=None):
+    """Agregar predicción al historial y guardar en JSON.
+
+    Se conserva el historial completo para que nunca se pierdan las predicciones
+    anteriores por un límite artificial.
+    """
     entry = {
         'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        'juego': obtener_config_juego()['nombre'],
         'prediccion': convertir_a_serializable(prediccion),
         'metodo': metodo,
-        'scores': convertir_a_serializable(scores_info)
+        'scores': convertir_a_serializable(scores_info),
+        'numero_plus': numero_plus
     }
     st.session_state.historial.insert(0, entry)  # Más reciente primero
-    if len(st.session_state.historial) > 20:  # Mantener solo últimas 20
-        st.session_state.historial.pop()
     st.session_state.prediction_count += 1
-    
+
     # Guardar en JSON
     guardar_historial_json()
 
@@ -1294,36 +1669,41 @@ def agregar_al_historial(prediccion, metodo, scores_info):
 # ============================================================================
 
 @st.cache_data
-def cargar_datos():
+def cargar_datos(juego='quini6'):
     """Cargar datos históricos desde CSV"""
     loader = DataLoader()
+    config_juego = obtener_config_juego(juego)
+    csv_path = config_juego['csv_path']
     
     try:
         # Siempre cargar desde CSV real
-        data = loader.load_csv('data/quini6_historico.csv')
+        data = loader.load_csv(csv_path)
     except Exception as e:
-        # Fallback a datos de muestra solo si falla completamente
-        st.warning(f"No se pudo cargar CSV: {e}. Usando datos de muestra.")
-        sorteos = generate_sample_data(num_sorteos=200)
-        data = loader.load_from_list(sorteos)
+        if juego == 'quini6':
+            # Mantener comportamiento existente para Quini6
+            st.warning(f"No se pudo cargar CSV: {e}. Usando datos de muestra.")
+            sorteos = generate_sample_data(num_sorteos=200)
+            data = loader.load_from_list(sorteos)
+        else:
+            raise Exception(f"No se pudo cargar historial de {config_juego['nombre']} en {csv_path}: {e}")
     
     return data
 
 
 @st.cache_data
-def ejecutar_analisis(_data):
+def ejecutar_analisis(data):
     """Ejecutar análisis estadístico completo"""
     # Análisis de frecuencias
     freq_analyzer = FrequencyAnalyzer()
-    freq_analyzer.analyze(_data)
+    freq_analyzer.analyze(data)
     
     # Análisis de correlaciones
     corr_analyzer = CorrelationAnalyzer()
-    corr_analyzer.analyze(_data)
+    corr_analyzer.analyze(data)
     
     # Análisis de patrones
     pattern_analyzer = PatternAnalyzer()
-    pattern_analyzer.analyze(_data)
+    pattern_analyzer.analyze(data)
     
     return freq_analyzer, corr_analyzer, pattern_analyzer
 
@@ -1336,10 +1716,10 @@ def mostrar_analisis_regresion_equilibrio(regression_analyzer):
     hay_desequilibrios = any(deseq.values())
     
     if not hay_desequilibrios:
-        st.info("✓ No se detectaron desequilibrios significativos. Sistema en equilibrio normal.")
+        st.info("No se detectaron desequilibrios significativos. Sistema en equilibrio normal.")
         return
     
-    st.warning("⚠️ Desequilibrios detectados - Sistema aplicará correcciones automáticas")
+    st.warning("Desequilibrios detectados. El sistema aplicará correcciones automáticas.")
     
     corr = summary['correcciones_aplicar']
     metricas = summary['metricas']
@@ -1357,21 +1737,21 @@ def mostrar_analisis_regresion_equilibrio(regression_analyzer):
                 st.markdown(f"→ {corr['paridad'].replace('_', ' ').title()}")
         else:
             st.markdown("Pares/Impares")
-            st.markdown("✓ En equilibrio")
+            st.markdown("En equilibrio")
     
     # Suma
     with cols[1]:
         if deseq['suma']:
             z_score = metricas['z_score_suma']
             st.markdown("Suma Total")
-            st.markdown(f"Z-Score: {z_score:+.2f}σ")
+            st.markdown(f"Z-Score: {z_score:+.2f}Ïƒ")
             if corr['suma']:
                 st.markdown(f"→ {corr['suma'].replace('_', ' ').title()}")
                 if metricas['suma_objetivo']:
                     st.markdown(f"Objetivo: ~{metricas['suma_objetivo']:.0f}")
         else:
             st.markdown("Suma Total")
-            st.markdown("✓ En equilibrio")
+            st.markdown("En equilibrio")
     
     # Rangos
     with cols[2]:
@@ -1382,7 +1762,7 @@ def mostrar_analisis_regresion_equilibrio(regression_analyzer):
                 st.markdown(f"{rango_nombre}: {accion}")
         else:
             st.markdown("Rangos")
-            st.markdown("✓ En equilibrio")
+            st.markdown("En equilibrio")
 
 
 def mostrar_analisis_resonancia_ciclos(cycle_resonance_analyzer):
@@ -1424,7 +1804,7 @@ def mostrar_analisis_resonancia_ciclos(cycle_resonance_analyzer):
     with st.expander("Ver Top 10 por Resonancia"):
         top = summary['top_resonancia']
         for i, (num, score, z) in enumerate(top, 1):
-            st.markdown(f"{i}. **Número {num}** - Score: {score:.2f} (Z: {z:+.2f}σ)")
+            st.markdown(f"{i}. **Número {num}** - Score: {score:.2f} (Z: {z:+.2f}Ïƒ)")
 
 
 def mostrar_analisis_multi_timeframe(multi_timeframe_analyzer):
@@ -1542,7 +1922,7 @@ def crear_grafico_frecuencias(freq_analyzer):
         y='Frecuencia',
         title='Frecuencia de Aparición de Números',
         color='Frecuencia',
-        color_continuous_scale=[[0, '#FFF8E1'], [0.5, '#FFD54F'], [1, '#F2A100']]
+        color_continuous_scale=[[0, '#E0F7F5'], [0.5, '#7FDCD3'], [1, '#2EC4B6']]
     )
     
     fig.update_layout(
@@ -1572,7 +1952,7 @@ def crear_grafico_calientes_frios(freq_analyzer):
     colores = []
     for n in todos_numeros:
         if n in calientes:
-            colores.append('#F2A100')  # Naranja para calientes
+            colores.append('#2EC4B6')  # Teal para calientes
         elif n in frios:
             colores.append('#BDBDBD')  # Gris para fríos
         else:
@@ -1612,7 +1992,7 @@ def crear_grafico_tendencias(freq_analyzer):
     items = sorted(tendencias.items(), key=lambda x: abs(x[1]), reverse=True)[:15]
     numeros = [str(n) for n, _ in items]
     valores = [t for _, t in items]
-    colores = ['#F2A100' if v > 0 else '#BDBDBD' for v in valores]
+    colores = ['#2EC4B6' if v > 0 else '#BDBDBD' for v in valores]
     
     fig = go.Figure(go.Bar(
         x=valores,
@@ -1637,9 +2017,58 @@ def crear_grafico_tendencias(freq_analyzer):
     return fig
 
 
+@st.cache_data
+def predecir_numero_plus(csv_path: str) -> dict:
+    """
+    Predice el Número plus del Loto (rango 0-9).
+    Usa frecuencia histórica, frecuencia reciente y latencia (sorteos desde última aparición).
+    Retorna el número con mayor score y el top 3.
+    """
+    import pandas as pd
+
+    df = pd.read_csv(csv_path)
+    if 'numero_plus' not in df.columns:
+        return {'numero_plus': 0, 'top3': [0, 1, 2], 'scores': {}}
+
+    serie = df['numero_plus'].dropna().astype(int)
+    total = len(serie)
+    if total == 0:
+        return {'numero_plus': 0, 'top3': [0, 1, 2], 'scores': {}}
+
+    recientes = min(50, total)
+    serie_reciente = serie.iloc[-recientes:]
+
+    scores = {}
+    for d in range(10):
+        # Frecuencia histórica (normalizada)
+        freq_hist = (serie == d).sum() / total
+
+        # Frecuencia reciente
+        freq_rec = (serie_reciente == d).sum() / recientes
+
+        # Latencia inversa: cuántos sorteos desde la última aparición
+        apariciones = serie[serie == d].index.tolist()
+        if apariciones:
+            latencia = total - 1 - apariciones[-1]
+        else:
+            latencia = total
+        lat_inv = latencia / (total + 1)  # cuanto más ausente, mayor penalización → invertir
+
+        # Score: 40% hist + 40% reciente + 20% latencia-inversa (penaliza mucho ausente)
+        scores[d] = 0.40 * freq_hist + 0.40 * freq_rec + 0.20 * (1 - lat_inv)
+
+    ordenados = sorted(scores.items(), key=lambda x: -x[1])
+    return {
+        'numero_plus': ordenados[0][0],
+        'top3': [d for d, _ in ordenados[:3]],
+        'scores': scores
+    }
+
+
 def mostrar_numeros_predichos(numeros, titulo="Predicción"):
     """Mostrar números predichos en formato visual atractivo"""
-    st.markdown(f"### {titulo}")
+    if titulo:
+        st.markdown(f"### {titulo}")
     
     # Convertir a lista de enteros para manejar tipos numpy
     numeros_limpios = [int(n) for n in numeros]
@@ -1653,7 +2082,107 @@ def mostrar_numeros_predichos(numeros, titulo="Predicción"):
     )
 
 
-def mostrar_portfolio(portfolio, freq_analyzer, portfolio_gen, metodo_nombre):
+def mostrar_bloque_copiable(texto, key_base="pred"):
+    """Muestra texto con el botón nativo de copiar de Streamlit."""
+    st.code(texto, language=None)
+
+
+def aplicar_fallback_copiado_nativo():
+    """Parchea el botón nativo de copiar de st.code con fallback execCommand."""
+    components.html(
+        """
+        <script>
+        (function () {
+            let doc = document;
+            try {
+                if (window.parent && window.parent.document) {
+                    doc = window.parent.document;
+                }
+            } catch (e) {
+                doc = document;
+            }
+
+            if (doc.__charlyCopyPatched) {
+                return;
+            }
+            doc.__charlyCopyPatched = true;
+
+            async function fallbackCopy(texto) {
+                try {
+                    const navParent = (window.parent && window.parent.navigator) ? window.parent.navigator : null;
+                    if (navParent && navParent.clipboard) {
+                        await navParent.clipboard.writeText(texto);
+                        return true;
+                    }
+                } catch (e) {}
+
+                try {
+                    if (navigator.clipboard && window.isSecureContext) {
+                        await navigator.clipboard.writeText(texto);
+                        return true;
+                    }
+                } catch (e) {}
+
+                try {
+                    const area = doc.createElement("textarea");
+                    area.value = texto;
+                    area.setAttribute("readonly", "");
+                    area.style.position = "fixed";
+                    area.style.left = "-9999px";
+                    doc.body.appendChild(area);
+                    area.focus();
+                    area.select();
+                    area.setSelectionRange(0, area.value.length);
+                    const ok = doc.execCommand("copy");
+                    doc.body.removeChild(area);
+                    return ok;
+                } catch (e) {
+                    return false;
+                }
+            }
+
+            function encontrarContenedorConCode(inicio) {
+                let el = inicio;
+                for (let i = 0; i < 10 && el; i++) {
+                    if (el.querySelector && el.querySelector("code")) {
+                        return el;
+                    }
+                    el = el.parentElement;
+                }
+                return null;
+            }
+
+            async function manejarEventoCopia(ev) {
+                const btn = ev.target.closest("button");
+                if (!btn) return;
+
+                const aria = (btn.getAttribute("aria-label") || "").toLowerCase();
+                const testid = (btn.getAttribute("data-testid") || "").toLowerCase();
+                const isCopyBtn = aria.includes("copy to clipboard") || aria.includes("copiar") || testid.includes("copy");
+                if (!isCopyBtn) return;
+
+                const bloque = encontrarContenedorConCode(btn);
+                if (!bloque) return;
+
+                const nodoTexto = bloque.querySelector("pre code") || bloque.querySelector("code") || bloque.querySelector("pre");
+                if (!nodoTexto) return;
+
+                const texto = (nodoTexto.innerText || "").trim();
+                if (!texto) return;
+
+                await fallbackCopy(texto);
+            }
+
+            doc.addEventListener("pointerdown", manejarEventoCopia, true);
+            doc.addEventListener("click", manejarEventoCopia, true);
+        })();
+        </script>
+        """,
+        height=0,
+    )
+
+
+def mostrar_portfolio(portfolio, freq_analyzer, portfolio_gen, metodo_nombre, numero_plus=None):
     """Muestra un portfolio de combinaciones generadas"""
     st.markdown(f"### {len(portfolio)} Combinaciones Generadas")
     
@@ -1678,7 +2207,7 @@ def mostrar_portfolio(portfolio, freq_analyzer, portfolio_gen, metodo_nombre):
             
             numeros_html_parts.append(
                 f"<div style='text-align: center; padding: 12px 8px; "
-                f"background: linear-gradient(135deg, #F2A100 0%, #E58E00 100%); "
+                f"background: linear-gradient(135deg, #2EC4B6 0%, #22A99C 100%); "
                 f"border-radius: 20px; width: 95px;'>"
                 f"<span style='font-size: 20px; font-weight: bold; color: white;'>{int(num):02d}</span>"
                 f"<span style='font-size: 12px; color: white;'> {indicador}</span>"
@@ -1715,7 +2244,8 @@ def mostrar_portfolio(portfolio, freq_analyzer, portfolio_gen, metodo_nombre):
                 'pares': pares,
                 'impares': 6 - pares,
                 'consecutivos': 0
-            }
+            },
+            numero_plus=numero_plus
         )
     
     # Resumen de cobertura
@@ -1727,11 +2257,11 @@ def mostrar_portfolio(portfolio, freq_analyzer, portfolio_gen, metodo_nombre):
         f"<div style='display: flex; gap: 40px; margin: 10px 0 15px 0;'>"
         f"<div>"
         f"<div style='color: #666; text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.5px; margin-bottom: 5px;'>NÚMEROS ÚNICOS TOTALES</div>"
-        f"<div style='color: #F2A100; font-size: 1.75rem; font-weight: 700;'>{coverage['numeros_unicos']}</div>"
+        f"<div style='color: #2EC4B6; font-size: 1.75rem; font-weight: 700;'>{coverage['numeros_unicos']}</div>"
         f"</div>"
         f"<div>"
         f"<div style='color: #666; text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.5px; margin-bottom: 5px;'>SCORE DE DIVERSIFICACIÓN</div>"
-        f"<div style='color: #F2A100; font-size: 1.75rem; font-weight: 700;'>{coverage['diversificacion_score']:.2%}</div>"
+        f"<div style='color: #2EC4B6; font-size: 1.75rem; font-weight: 700;'>{coverage['diversificacion_score']:.2%}</div>"
         f"</div>"
         f"</div>",
         unsafe_allow_html=True
@@ -1746,8 +2276,9 @@ def mostrar_portfolio(portfolio, freq_analyzer, portfolio_gen, metodo_nombre):
         nums_formatted = ', '.join([f"{int(n):02d}" for n in combo_data['numeros']])
         texto_copiar_lines.append(f"#{idx} {combo_data['nombre']}: {nums_formatted}")
     
-    texto_copiar = '\n'.join(texto_copiar_lines)
-    st.code(texto_copiar, language=None)
+    nombre_juego_copiar = "Loto" if st.session_state.juego_actual == 'loto' else "Quini6"
+    texto_copiar = f"{nombre_juego_copiar}:\n" + '\n'.join(texto_copiar_lines)
+    mostrar_bloque_copiable(texto_copiar, key_base="portfolio")
 
 
 # ============================================================================
@@ -1756,6 +2287,8 @@ def mostrar_portfolio(portfolio, freq_analyzer, portfolio_gen, metodo_nombre):
 
 def main():
     init_session_state()
+    aplicar_fallback_copiado_nativo()
+    config_juego_actual = obtener_config_juego(st.session_state.juego_actual)
     
     # HEADER
     fecha_info = f"<div class='banner-fecha'>Datos actualizados al {st.session_state.ultima_fecha_csv}</div>" if st.session_state.ultima_fecha_csv else ""
@@ -1764,56 +2297,147 @@ def main():
         <div class="app-banner">
             <div class="banner-logo">CP</div>
             <div class="banner-title">Charly Predictor</div>
-            <div class="banner-subtitle">Quini 6</div>
+            <div class="banner-subtitle">{config_juego_actual['nombre']}</div>
             {fecha_info}
         </div>
     """, unsafe_allow_html=True)
     
     # POZOS ACTUALES
-    if st.session_state.pozos_actuales:
-        pozos = st.session_state.pozos_actuales
-        
-        # Formatear valores con separadores de miles y obtener info de ganadores
-        tradicional, trad_info = formatear_pozo(pozos.get('Tradicional'))
-        segunda, seg_info = formatear_pozo(pozos.get('Segunda'))
-        revancha, rev_info = formatear_pozo(pozos.get('Revancha'))
-        siempre_sale, ss_info = formatear_pozo(pozos.get('SiempreSale'))
-        
-        # Reemplazar strings vacíos por guión para mejor visualización
-        trad_info = trad_info if trad_info else '-'
-        seg_info = seg_info if seg_info else '-'
-        rev_info = rev_info if rev_info else '-'
-        ss_info = ss_info if ss_info else '-'
-        
-        pozos_html = f"""
-        <div class="pozos-container">
-            <div class="pozos-title">Pozos Actuales</div>
-            <div class="pozos-grid">
-                <div class="pozo-card">
-                    <div class="pozo-modalidad">Tradicional</div>
-                    <div class="pozo-valor">${tradicional}</div>
-                    <div class="pozo-info">{trad_info}</div>
-                </div>
-                <div class="pozo-card">
-                    <div class="pozo-modalidad">La Segunda</div>
-                    <div class="pozo-valor">${segunda}</div>
-                    <div class="pozo-info">{seg_info}</div>
-                </div>
-                <div class="pozo-card">
-                    <div class="pozo-modalidad">Revancha</div>
-                    <div class="pozo-valor">${revancha}</div>
-                    <div class="pozo-info">{rev_info}</div>
-                </div>
-                <div class="pozo-card">
-                    <div class="pozo-modalidad">Siempre Sale</div>
-                    <div class="pozo-valor">${siempre_sale}</div>
-                    <div class="pozo-info">{ss_info}</div>
+    if config_juego_actual['usa_pozos']:
+        if st.session_state.juego_actual == 'quini6' and st.session_state.pozos_actuales:
+            pozos = st.session_state.pozos_actuales
+            trad,    trad_info = formatear_pozo(pozos.get('Tradicional'))
+            segunda, seg_info  = formatear_pozo(pozos.get('Segunda'))
+            revancha,rev_info  = formatear_pozo(pozos.get('Revancha'))
+            ss,      ss_info   = formatear_pozo(pozos.get('SiempreSale'))
+            trad_info = trad_info or '-'
+            seg_info  = seg_info  or '-'
+            rev_info  = rev_info  or '-'
+            ss_info   = ss_info   or '-'
+            st.markdown(f"""
+            <div class="pozos-container">
+                <div class="pozos-title">Pozos Actuales</div>
+                <div class="pozos-grid">
+                    <div class="pozo-card">
+                        <div class="pozo-modalidad">Tradicional</div>
+                        <div class="pozo-valor">${trad}</div>
+                        <div class="pozo-info">{trad_info}</div>
+                    </div>
+                    <div class="pozo-card">
+                        <div class="pozo-modalidad">La Segunda</div>
+                        <div class="pozo-valor">${segunda}</div>
+                        <div class="pozo-info">{seg_info}</div>
+                    </div>
+                    <div class="pozo-card">
+                        <div class="pozo-modalidad">Revancha</div>
+                        <div class="pozo-valor">${revancha}</div>
+                        <div class="pozo-info">{rev_info}</div>
+                    </div>
+                    <div class="pozo-card">
+                        <div class="pozo-modalidad">Siempre Sale</div>
+                        <div class="pozo-valor">${ss}</div>
+                        <div class="pozo-info">{ss_info}</div>
+                    </div>
                 </div>
             </div>
-        </div>
-        """
-        
-        st.markdown(pozos_html, unsafe_allow_html=True)
+            """, unsafe_allow_html=True)
+
+        elif st.session_state.juego_actual == 'loto' and st.session_state.pozos_loto:
+            pozos = st.session_state.pozos_loto
+            trad,    trad_info  = formatear_pozo(pozos.get('Tradicional'))
+            match,   match_info = formatear_pozo(pozos.get('Match'))
+            desq,    desq_info  = formatear_pozo(pozos.get('Desquite'))
+            sale,    sale_info  = formatear_pozo(pozos.get('SaleOSale'))
+            trad_info  = trad_info  or '-'
+            match_info = match_info or '-'
+            desq_info  = desq_info  or '-'
+            sale_info  = sale_info  or '-'
+
+            # Resultados del ultimo sorteo desde XML (si existen).
+            resultados = pozos.get('Resultados', {})
+            meta = pozos.get('Meta', {})
+
+            def _fmt_nums(nums):
+                if not isinstance(nums, list) or len(nums) != 6:
+                    return None
+                try:
+                    return '-'.join([f"{int(n):02d}" for n in nums])
+                except Exception:
+                    return None
+
+            lineas_resultados = []
+            trad_nums = _fmt_nums(resultados.get('Tradicional'))
+            match_nums = _fmt_nums(resultados.get('Match'))
+            desq_nums = _fmt_nums(resultados.get('Desquite'))
+            sale_nums = _fmt_nums(resultados.get('SaleOSale'))
+            plus_num = resultados.get('Plus')
+
+            if trad_nums:
+                lineas_resultados.append(f"Tradicional {trad_nums}")
+            if match_nums:
+                lineas_resultados.append(f"Match {match_nums}")
+            if desq_nums:
+                lineas_resultados.append(f"Desquite {desq_nums}")
+            if sale_nums:
+                lineas_resultados.append(f"Sale o Sale {sale_nums}")
+            if plus_num is not None:
+                try:
+                    lineas_resultados.append(f"Numero plus {int(plus_num):02d}")
+                except Exception:
+                    lineas_resultados.append(f"Numero plus {plus_num}")
+
+            fecha_meta = meta.get('fecha')
+            if isinstance(fecha_meta, str) and len(fecha_meta) == 10 and '-' in fecha_meta:
+                try:
+                    yyyy, mm, dd = fecha_meta.split('-')
+                    fecha_meta = f"{dd}/{mm}/{yyyy}"
+                except Exception:
+                    pass
+            sorteo_meta = meta.get('sorteo')
+
+            detalle_sorteo = ''
+            if sorteo_meta or fecha_meta:
+                sorteo_txt = f"Sorteo {sorteo_meta}" if sorteo_meta else ''
+                fecha_txt = f"Fecha {fecha_meta}" if fecha_meta else ''
+                separador = ' | ' if sorteo_txt and fecha_txt else ''
+                detalle_sorteo = f"{sorteo_txt}{separador}{fecha_txt}"
+
+            bloque_resultados = ''
+            if detalle_sorteo or lineas_resultados:
+                resultados_txt = ' | '.join(lineas_resultados)
+                detalle_html = f'<div style="margin-top:0.2rem;color:#999;font-size:0.78rem;">{detalle_sorteo}</div>' if detalle_sorteo else ''
+                resultados_html = f'<div style="margin-top:0.2rem;color:#ddd;font-size:0.76rem;line-height:1.35;">{resultados_txt}</div>' if resultados_txt else ''
+                bloque_resultados = f'{detalle_html}{resultados_html}'
+
+            st.markdown(f"""
+            <div class="pozos-container">
+                <div class="pozos-title">Pozos Actuales</div>
+                <div class="pozos-grid">
+                    <div class="pozo-card">
+                        <div class="pozo-modalidad">Tradicional</div>
+                        <div class="pozo-valor">${trad}</div>
+                        <div class="pozo-info">{trad_info}</div>
+                    </div>
+                    <div class="pozo-card">
+                        <div class="pozo-modalidad">Match</div>
+                        <div class="pozo-valor">${match}</div>
+                        <div class="pozo-info">{match_info}</div>
+                    </div>
+                    <div class="pozo-card">
+                        <div class="pozo-modalidad">Desquite</div>
+                        <div class="pozo-valor">${desq}</div>
+                        <div class="pozo-info">{desq_info}</div>
+                    </div>
+                    <div class="pozo-card">
+                        <div class="pozo-modalidad">Sale o Sale</div>
+                        <div class="pozo-valor">${sale}</div>
+                        <div class="pozo-info">{sale_info}</div>
+                    </div>
+                </div>
+                {bloque_resultados}
+                <div style="margin-top:0.2rem;color:#888;font-size:0.76rem;">Plus: Vacante</div>
+            </div>
+            """, unsafe_allow_html=True)
     
     # ========================================================================
     # SIDEBAR - CONFIGURACIÓN
@@ -1825,13 +2449,32 @@ def main():
         <div class="sidebar-banner">
             <div class="banner-logo">CP</div>
             <div class="banner-title">Charly Predictor</div>
-            <div class="banner-subtitle">Quini 6</div>
+            <div class="banner-subtitle">%s</div>
         </div>
-        """, unsafe_allow_html=True)
+        """ % config_juego_actual['nombre'], unsafe_allow_html=True)
+
+        st.markdown("### Juego")
+        juego_label = st.radio(
+            "Selecciona el juego:",
+            options=list(GAME_LABEL_TO_KEY.keys()),
+            index=0 if st.session_state.juego_actual == 'quini6' else 1,
+            horizontal=True,
+            label_visibility='collapsed'
+        )
+        juego_seleccionado = GAME_LABEL_TO_KEY[juego_label]
+
+        if juego_seleccionado != st.session_state.juego_actual:
+            st.session_state.juego_actual = juego_seleccionado
+            st.session_state.data_loaded = False
+            st.session_state.current_data = None
+            st.session_state.ultima_fecha_csv = obtener_ultima_fecha_csv(juego_seleccionado)
+            st.rerun()
+
+        config_juego_actual = obtener_config_juego(st.session_state.juego_actual)
         
         # Banner informativo de configuración optimizada
         # st.info("""
-        # ✨ **Configuración Optimizada Activa** | Rendimiento: 2.25 aciertos/sorteo promedio  
+        # Configuración Optimizada Activa | Rendimiento: 2.25 aciertos/sorteo promedio
         # Los parámetros predeterminados han sido optimizados mediante 130+ pruebas de configuración.
         # """)
         
@@ -1840,10 +2483,15 @@ def main():
         # Cargar datos automáticamente al inicio
         if not st.session_state.data_loaded:
             with st.spinner("Cargando datos históricos..."):
-                data = cargar_datos()
-                st.session_state.current_data = data
-                st.session_state.data_loaded = True
-                st.session_state.ultima_fecha_csv = obtener_ultima_fecha_csv()
+                try:
+                    data = cargar_datos(st.session_state.juego_actual)
+                    st.session_state.current_data = data
+                    st.session_state.data_loaded = True
+                    st.session_state.ultima_fecha_csv = obtener_ultima_fecha_csv(st.session_state.juego_actual)
+                except Exception as e:
+                    st.session_state.data_loaded = False
+                    st.session_state.current_data = None
+                    st.error(str(e))
 
         # Actualizar desde QuiniYa
         # Detectar si estamos en Streamlit Cloud
@@ -1853,35 +2501,50 @@ def main():
         if es_cloud:
             st.info("La actualización automática no está disponible en la versión cloud")
         else:
-            if st.button("Actualizar datos", width='stretch'):
+            if st.button(f"Actualizar datos de {config_juego_actual['nombre']}", width='stretch'):
                 with st.spinner("Actualizando datos desde la red"):
                     try:
-                        nuevos = actualizar_historico_csv('data/quini6_historico.csv')
+                        if st.session_state.juego_actual == 'quini6':
+                            nuevos = actualizar_historico_csv(config_juego_actual['csv_path'])
+                        elif st.session_state.juego_actual == 'loto':
+                            nuevos = actualizar_historico_loto_csv(config_juego_actual['csv_path'])
+                        else:
+                            raise ValueError(f"Juego desconocido: {st.session_state.juego_actual}. No se puede actualizar datos.")
+
                         # Limpiar cachés para forzar recarga con datos nuevos
                         cargar_datos.clear()
                         ejecutar_analisis.clear()
+
                         # Recargar datos y análisis con sorteos nuevos
-                        data = cargar_datos()
+                        data = cargar_datos(st.session_state.juego_actual)
                         st.session_state.current_data = data
                         st.session_state.data_loaded = True
                         
                         # Actualizar última fecha del CSV
-                        st.session_state.ultima_fecha_csv = obtener_ultima_fecha_csv()
+                        st.session_state.ultima_fecha_csv = obtener_ultima_fecha_csv(st.session_state.juego_actual)
                         
-                        # Obtener pozos actuales
-                        pozos = obtener_pozos_ultimo_sorteo()
-                        if pozos:
-                            st.session_state.pozos_actuales = pozos
-                            # Guardar pozos en JSON para persistencia
-                            guardar_pozos_json(pozos)
-                        
+                        pozos = None
+                        if config_juego_actual['usa_pozos']:
+                            if st.session_state.juego_actual == 'quini6':
+                                # QuiniYa.com.ar → pozos Quini6
+                                pozos = obtener_pozos_ultimo_sorteo()
+                                if pozos:
+                                    st.session_state.pozos_actuales = pozos
+                                    guardar_pozos_json(pozos)
+                            elif st.session_state.juego_actual == 'loto':
+                                # loto.loteriadelaciudad.gob.ar → pozos Loto
+                                pozos = obtener_pozos_loto()
+                                if pozos:
+                                    st.session_state.pozos_loto = pozos
+                                    guardar_pozos_loto_json(pozos)
+
                         # Construir mensaje combinado
                         mensajes = []
                         if nuevos > 0:
                             mensajes.append(f"Agregados {nuevos} sorteos nuevos.")
                         else:
                             mensajes.append("No hay sorteos nuevos para agregar.")
-                        
+
                         if pozos:
                             mensajes.append("Pozos actualizados correctamente")
                         
@@ -2000,32 +2663,94 @@ def main():
             )
             
             st.markdown("#### Pesos de Scoring")
+
+            weights_default = {
+                'peso_frecuencia': st.session_state.get('peso_frecuencia', OPTIMAL_WEIGHTS['peso_frecuencia']),
+                'peso_frecuencia_reciente': st.session_state.get('peso_frecuencia_reciente', OPTIMAL_WEIGHTS['peso_frecuencia_reciente']),
+                'peso_ciclo': st.session_state.get('peso_ciclo', OPTIMAL_WEIGHTS['peso_ciclo']),
+                'peso_latencia': st.session_state.get('peso_latencia', OPTIMAL_WEIGHTS['peso_latencia']),
+                'peso_tendencia': st.session_state.get('peso_tendencia', OPTIMAL_WEIGHTS['peso_tendencia']),
+            }
             
             peso_frecuencia = st.slider(
                 "Frecuencia General",
-                0.0, 1.0, OPTIMAL_WEIGHTS['peso_frecuencia'], 0.05
+                0.0, 1.0, weights_default['peso_frecuencia'], 0.05
             )
+            st.session_state['peso_frecuencia'] = peso_frecuencia
             
             peso_frecuencia_reciente = st.slider(
                 "Frecuencia Reciente",
-                0.0, 1.0, OPTIMAL_WEIGHTS['peso_frecuencia_reciente'], 0.05
+                0.0, 1.0, weights_default['peso_frecuencia_reciente'], 0.05
             )
+            st.session_state['peso_frecuencia_reciente'] = peso_frecuencia_reciente
             
             peso_ciclo = st.slider(
                 "Ciclos",
-                0.0, 1.0, OPTIMAL_WEIGHTS['peso_ciclo'], 0.05
+                0.0, 1.0, weights_default['peso_ciclo'], 0.05
             )
+            st.session_state['peso_ciclo'] = peso_ciclo
             
             peso_latencia = st.slider(
                 "Latencia",
-                0.0, 1.0, OPTIMAL_WEIGHTS['peso_latencia'], 0.05,
-                help="⚠️ Optimización: Latencia en 0.00 mejora el rendimiento"
+                0.0, 1.0, weights_default['peso_latencia'], 0.05,
+                help="Optimización: Latencia en 0.00 mejora el rendimiento"
             )
+            st.session_state['peso_latencia'] = peso_latencia
             
             peso_tendencia = st.slider(
                 "Tendencia",
-                0.0, 1.0, OPTIMAL_WEIGHTS['peso_tendencia'], 0.05
+                0.0, 1.0, weights_default['peso_tendencia'], 0.05
             )
+            st.session_state['peso_tendencia'] = peso_tendencia
+
+            st.markdown("---")
+
+            if st.button("Actualizar Parametros", type="secondary"):
+                if not st.session_state.get('data_loaded'):
+                    st.warning("Cargá los datos antes de optimizar los pesos.")
+                else:
+                    try:
+                        with st.spinner("Optimizando pesos con validación walk-forward..."):
+                            data = st.session_state.current_data
+                            train_window = max(120, min(200, len(data) - 60))
+                            test_window = 10
+                            step_size = 10
+
+                            optimization = weight_manager.optimize_walkforward(
+                                data,
+                                train_window=train_window,
+                                test_window=test_window,
+                                step_size=step_size,
+                                use_ideas=usar_regresion_equilibrio or usar_resonancia_ciclos or usar_multi_timeframe,
+                                use_idea1=usar_resonancia_ciclos,
+                                use_idea2=usar_multi_timeframe,
+                                use_idea3=usar_regresion_equilibrio,
+                                idea3_ventana=ventana_regresion if usar_regresion_equilibrio else 16,
+                                idea3_umbral=umbral_regresion / 100.0 if usar_regresion_equilibrio else 0.12,
+                            )
+
+                        best_weights = optimization['best_weights']
+                        peso_frecuencia = float(best_weights['peso_frecuencia'])
+                        peso_frecuencia_reciente = float(best_weights['peso_frecuencia_reciente'])
+                        peso_ciclo = float(best_weights['peso_ciclo'])
+                        peso_latencia = float(best_weights['peso_latencia'])
+                        peso_tendencia = float(best_weights['peso_tendencia'])
+
+                        st.session_state['peso_frecuencia'] = peso_frecuencia
+                        st.session_state['peso_frecuencia_reciente'] = peso_frecuencia_reciente
+                        st.session_state['peso_ciclo'] = peso_ciclo
+                        st.session_state['peso_latencia'] = peso_latencia
+                        st.session_state['peso_tendencia'] = peso_tendencia
+
+                        summary = optimization.get('summary', {})
+                        accuracy = summary.get('accuracy_promedio', 0.0)
+                        stability = optimization.get('results', {}).get('summary', {}).get('accuracy_std', 0.0)
+                        st.success(
+                            "Parámetros actualizados con validación histórica. "
+                            f"Accuracy promedio: {accuracy:.2%}, std: {stability:.2%}."
+                        )
+                    except Exception as exc:
+                        st.error(f"No se pudieron actualizar los parámetros: {exc}")
             
             st.markdown("---")
             
@@ -2154,7 +2879,7 @@ def main():
         # Botón de generar predicción
         st.markdown("## Generar Predicción")
         
-        col_btn1, col_btn2, col_btn3 = st.columns([2, 1, 1])
+        col_btn1, col_btn2 = st.columns([1, 3])
         
         with col_btn1:
             texto_boton = "GENERAR PREDICCIONES" if usar_portfolio and n_combinaciones > 1 else "GENERAR PREDICCIÓN"
@@ -2167,6 +2892,14 @@ def main():
         if generar:
             # Incrementar contador
             st.session_state.prediction_count += 1
+
+            # Calcular número plus para Loto (una sola vez, se reutiliza en historial y display)
+            _plus_loto = None
+            if st.session_state.juego_actual == 'loto':
+                _config_loto = obtener_config_juego('loto')
+                _plus_result = predecir_numero_plus(_config_loto['csv_path'])
+                _plus_loto = _plus_result['numero_plus']
+                _plus_top3 = _plus_result['top3']
             
             # GENERACIÓN CON PORTFOLIO
             if usar_portfolio and n_combinaciones > 1:
@@ -2184,7 +2917,7 @@ def main():
                     
                     st.markdown("---")
                     st.markdown("## Método Estándar")
-                    mostrar_portfolio(portfolio_std, freq_analyzer, portfolio_gen, "Estándar")
+                    mostrar_portfolio(portfolio_std, freq_analyzer, portfolio_gen, "Estándar", numero_plus=_plus_loto)
                     
                     # MÉTODO CONDICIONAL
                     with st.spinner(f"Generando {n_combinaciones} combinaciones (Método Condicional)..."):
@@ -2199,7 +2932,7 @@ def main():
                     
                     st.markdown("---")
                     st.markdown("## Método Condicional")
-                    mostrar_portfolio(portfolio_cond, freq_analyzer, portfolio_gen_cond, "Condicional")
+                    mostrar_portfolio(portfolio_cond, freq_analyzer, portfolio_gen_cond, "Condicional", numero_plus=_plus_loto)
                 
                 else:
                     # Un solo método
@@ -2215,8 +2948,22 @@ def main():
                         )
                     
                     st.markdown("---")
-                    mostrar_portfolio(portfolio, freq_analyzer, portfolio_gen, metodo_texto)
-            
+                    mostrar_portfolio(portfolio, freq_analyzer, portfolio_gen, metodo_texto, numero_plus=_plus_loto)
+                
+                # NÚMERO PLUS para portfolio (solo Loto)
+                if st.session_state.juego_actual == 'loto':
+                    st.markdown("---")
+                    st.markdown("### Número plus sugerido - Loto")
+                    st.markdown(
+                        f'<div style="display:flex;gap:12px;align-items:center;margin-bottom:0.5rem;">'
+                        f'<div class="numero-predicho" style="background:#2EC4B6;color:#0F1B33;font-weight:700;font-size:1.3rem;'
+                        f'width:48px;height:48px;display:flex;align-items:center;justify-content:center;border-radius:50%;">'
+                        f'{_plus_loto}</div>'
+                        f'<span style="color:#888;font-size:0.85rem;">Alternativas: {_plus_top3[1]} · {_plus_top3[2]}</span>'
+                        f'</div>',
+                        unsafe_allow_html=True
+                    )
+
             # GENERACIÓN TRADICIONAL (sin portfolio)
             else:
                 spinner_text = "Optimizando predicción (Monte Carlo 5000 iteraciones)..." if usar_optimizer else "Generando predicción..."
@@ -2274,56 +3021,56 @@ def main():
                     
                     # Mostrar resultados según método
                     if metodo == GenerationStrategy.BOTH:
-                        # AMBOS MÉTODOS
-                        col1, col2 = st.columns(2)
+                        # AMBOS MÉTODOS - uno debajo del otro
+                        st.markdown("### Método Estándar")
+                        mostrar_numeros_predichos(
+                            result['standard']['combination'],
+                            ""
+                        )
                         
-                        with col1:
-                            st.markdown("### Método Estándar")
-                            mostrar_numeros_predichos(
-                                result['standard']['combination'],
-                                ""
-                            )
-                            
-                            st.markdown("##### Estadísticas")
-                            analysis_std = result['standard']['analysis']
-                            
-                            subcol1, subcol2, subcol3 = st.columns(3)
-                            with subcol1:
-                                st.metric("Suma", analysis_std['suma_total'])
-                            with subcol2:
-                                st.metric("Score", f"{analysis_std['score_promedio']:.3f}")
-                            with subcol3:
-                                st.metric("Pares", f"{analysis_std['pares']}/6")
+                        st.markdown("##### Estadísticas")
+                        analysis_std = result['standard']['analysis']
                         
-                        with col2:
-                            st.markdown("### Método Condicional")
-                            mostrar_numeros_predichos(
-                                result['conditional']['combination'],
-                                ""
-                            )
-                            
-                            st.markdown("##### Estadísticas")
-                            analysis_cond = result['conditional']['analysis']
-                            
-                            subcol1, subcol2, subcol3 = st.columns(3)
-                            with subcol1:
-                                st.metric("Suma", analysis_cond['suma_total'])
-                            with subcol2:
-                                st.metric("Score", f"{analysis_cond['score_promedio']:.3f}")
-                            with subcol3:
-                                st.metric("Correlation", f"{analysis_cond['correlation_score']:.3f}")
+                        subcol1, subcol2, subcol3, _ = st.columns([1, 1, 1, 3])
+                        with subcol1:
+                            st.metric("Suma", analysis_std['suma_total'])
+                        with subcol2:
+                            st.metric("Score", f"{analysis_std['score_promedio']:.3f}")
+                        with subcol3:
+                            st.metric("Pares", f"{analysis_std['pares']}/6")
+                        
+                        st.markdown("---")
+                        
+                        st.markdown("### Método Condicional")
+                        mostrar_numeros_predichos(
+                            result['conditional']['combination'],
+                            ""
+                        )
+                        
+                        st.markdown("##### Estadísticas")
+                        analysis_cond = result['conditional']['analysis']
+                        
+                        subcol1, subcol2, subcol3, _ = st.columns([1, 1, 1, 3])
+                        with subcol1:
+                            st.metric("Suma", analysis_cond['suma_total'])
+                        with subcol2:
+                            st.metric("Score", f"{analysis_cond['score_promedio']:.3f}")
+                        with subcol3:
+                            st.metric("Correlation", f"{analysis_cond['correlation_score']:.3f}")
                         
                         # Agregar ambas al historial
                         sufijo_opt = " + Optimizer" if usar_optimizer else ""
                         agregar_al_historial(
                             result['standard']['combination'],
                             f"Estándar{sufijo_opt}",
-                            analysis_std
+                            analysis_std,
+                            numero_plus=_plus_loto
                         )
                         agregar_al_historial(
                             result['conditional']['combination'],
                             f"Condicional{sufijo_opt}",
-                            analysis_cond
+                            analysis_cond,
+                            numero_plus=_plus_loto
                         )
                         
                         # ANÁLISIS RÁPIDO - Tercera opción (sin scoring complejo)
@@ -2335,7 +3082,7 @@ def main():
                         mostrar_numeros_predichos(prediccion_rapida['numeros'], "")
                         
                         st.markdown("##### Estadísticas")
-                        subcol1, subcol2, subcol3 = st.columns(3)
+                        subcol1, subcol2, subcol3, _ = st.columns([1, 1, 1, 3])
                         with subcol1:
                             st.metric("Suma", prediccion_rapida['suma'])
                         with subcol2:
@@ -2353,7 +3100,8 @@ def main():
                                 'pares': prediccion_rapida['pares'],
                                 'impares': prediccion_rapida['impares'],
                                 'consecutivos': 0
-                            }
+                            },
+                            numero_plus=_plus_loto
                         )
                     
                     else:
@@ -2365,7 +3113,7 @@ def main():
                         analysis = result['analysis']
                         
                         # Métricas
-                        col1, col2, col3, col4, col5 = st.columns(5)
+                        col1, col2, col3, col4, col5, _ = st.columns([1, 1, 1, 1, 1, 2])
                         
                         with col1:
                             st.metric("Suma Total", analysis['suma_total'])
@@ -2385,23 +3133,82 @@ def main():
                         agregar_al_historial(
                             result['combination'],
                             metodo_nombre,
-                            analysis
+                            analysis,
+                            numero_plus=_plus_loto
                         )
                     
                     # Resumen para copiar
                     # Preparar texto para copiar
                     opt_suffix = " (Opt)" if usar_optimizer else ""
+
+                    lineas_pozos = []
+                    if st.session_state.juego_actual == 'loto' and st.session_state.pozos_loto:
+                        pozos = st.session_state.pozos_loto
+                        trad,  _ = formatear_pozo(pozos.get('Tradicional'))
+                        match, _ = formatear_pozo(pozos.get('Match'))
+                        desq,  _ = formatear_pozo(pozos.get('Desquite'))
+                        sale,  _ = formatear_pozo(pozos.get('SaleOSale'))
+                        lineas_pozos = [
+                            f"Tradicional: ${trad}",
+                            f"Match: ${match}",
+                            f"Desquite: ${desq}",
+                            f"Sale o Sale: ${sale}",
+                        ]
+                    elif st.session_state.juego_actual == 'quini6' and st.session_state.pozos_actuales:
+                        pozos = st.session_state.pozos_actuales
+                        trad,     _ = formatear_pozo(pozos.get('Tradicional'))
+                        segunda,  _ = formatear_pozo(pozos.get('Segunda'))
+                        revancha, _ = formatear_pozo(pozos.get('Revancha'))
+                        sale,     _ = formatear_pozo(pozos.get('SiempreSale'))
+                        lineas_pozos = [
+                            f"Tradicional: ${trad}",
+                            f"La Segunda: ${segunda}",
+                            f"Revancha: ${revancha}",
+                            f"Siempre Sale: ${sale}",
+                        ]
+
+                    nombre_juego_copiar = "Loto" if st.session_state.juego_actual == 'loto' else "Quini6"
+
                     if metodo == GenerationStrategy.BOTH:
                         nums_std = ', '.join([f"{int(n):02d}" for n in result['standard']['combination']])
                         nums_cond = ', '.join([f"{int(n):02d}" for n in result['conditional']['combination']])
                         nums_rapido = ', '.join([f"{int(n):02d}" for n in prediccion_rapida['numeros']])
-                        texto_copiar = f"Estándar{opt_suffix}: {nums_std}\nCondicional{opt_suffix}: {nums_cond}\nRápido: {nums_rapido}"
+                        texto_copiar = f"{nombre_juego_copiar}:\nEstándar{opt_suffix}: {nums_std}\nCondicional{opt_suffix}: {nums_cond}\nRápido: {nums_rapido}\n"
+
+                        mejor_metodo = calcular_mejor_metodo_historial()
+                        if mejor_metodo:
+                            texto_copiar += f"Mejor método: {mejor_metodo[0]} ({mejor_metodo[1]:.1f}% aciertos)\n"
+
+                        if lineas_pozos:
+                            texto_copiar += "\n" + "\n".join(lineas_pozos)
                     else:
                         texto_copiar = ', '.join([f"{int(n):02d}" for n in result['combination']])
                         if usar_optimizer:
                             texto_copiar = f"(Opt) {texto_copiar}"
+                        texto_copiar = f"{nombre_juego_copiar}:\n" + texto_copiar
+                        if lineas_pozos:
+                            texto_copiar += "\n\n" + "\n".join(lineas_pozos)
                     
-                    st.code(texto_copiar, language=None)
+                    # NÚMERO PLUS (solo para Loto, siempre)
+                    if st.session_state.juego_actual == 'loto':
+                        st.markdown("---")
+                        st.markdown("### Número plus sugerido - Loto")
+                        st.markdown(
+                            f'<div style="display:flex;gap:12px;align-items:center;margin-bottom:0.5rem;">'
+                            f'<div class="numero-predicho" style="background:#2EC4B6;color:#0F1B33;font-weight:700;font-size:1.3rem;'
+                            f'width:48px;height:48px;display:flex;align-items:center;justify-content:center;border-radius:50%;">'
+                            f'{_plus_loto}</div>'
+                            f'<span style="color:#888;font-size:0.85rem;">Alternativas: {_plus_top3[1]} · {_plus_top3[2]}</span>'
+                            f'</div>',
+                            unsafe_allow_html=True
+                        )
+                        # Actualizar texto_copiar para incluir plus
+                        texto_copiar = texto_copiar + f"\nNumero plus: {_plus_loto}"
+
+                    mostrar_bloque_copiable(
+                        texto_copiar,
+                        key_base=f"pred_{st.session_state.prediction_count}"
+                    )
     
     # ========================================================================
     # TAB 2: CONTROL BOLETA
@@ -2466,14 +3273,22 @@ def main():
         st.markdown("### Selecciona la fecha del sorteo")
         
         data = st.session_state.current_data
-        fechas_disponibles = obtener_fechas_validas(data)
+        es_quini = st.session_state.juego_actual == 'quini6'
+        fechas_disponibles = obtener_fechas_validas(data, juego=st.session_state.juego_actual)
+
+        if not fechas_disponibles:
+            st.warning("No hay fechas disponibles para controlar con los datos cargados.")
+            return
         
         # Formatear fechas para mostrar con día de la semana
         opciones_fecha = []
         for fecha in fechas_disponibles:
             fecha_dt = pd.Timestamp(fecha)
-            dia_semana = "Miércoles" if fecha_dt.dayofweek == 2 else "Domingo"
-            opciones_fecha.append(f"{dia_semana} {fecha.strftime('%d/%m/%Y')}")
+            if es_quini:
+                dia_semana = "Miércoles" if fecha_dt.dayofweek == 2 else "Domingo"
+                opciones_fecha.append(f"{dia_semana} {fecha.strftime('%d/%m/%Y')}")
+            else:
+                opciones_fecha.append(fecha.strftime('%d/%m/%Y'))
         
         # Crear diccionario para mapear opción -> fecha
         mapa_fechas = dict(zip(opciones_fecha, fechas_disponibles))
@@ -2528,7 +3343,7 @@ def main():
             box-sizing: border-box !important;
         }
         div[role="tabpanel"][id*="tabpanel-1"] [data-testid="stTextInput"] input:focus {
-            border: 3px solid #F2A100 !important;
+            border: 3px solid #2EC4B6 !important;
             outline: none !important;
         }
         div[role="tabpanel"][id*="tabpanel-1"] [data-testid="stTextInput"] label {
@@ -2560,17 +3375,22 @@ def main():
                     )
                     numeros_texto.append(num_str)
         
-        # Convertir y validar
+        # Convertir y validar (0 es válido; None representa campo incompleto)
         numeros_ingresados = []
         for num_str in numeros_texto:
+            txt = num_str.strip()
+            if txt == "":
+                numeros_ingresados.append(None)
+                continue
+
             try:
-                num = int(num_str) if num_str.strip() else 0
+                num = int(txt)
                 if 0 <= num <= 45:
                     numeros_ingresados.append(num)
                 else:
-                    numeros_ingresados.append(0)
+                    numeros_ingresados.append(None)
             except:
-                numeros_ingresados.append(0)
+                numeros_ingresados.append(None)
         
         # Botón con el mismo ancho que las 6 esferas
         cols_button = st.columns([0.25, 0.5, 0.25])
@@ -2580,19 +3400,27 @@ def main():
         # Validaciones
         if verificar:
             # Validar que no haya números repetidos
-            if len(set(numeros_ingresados)) != 6:
-                st.error("⚠️ No puedes repetir números. Cada número debe ser único.")
-            elif 0 in numeros_ingresados:
-                st.warning("⚠️ Por favor completa los 6 números (no pueden ser 0).")
+            if any(n is None for n in numeros_ingresados):
+                st.warning("Por favor completa los 6 números con valores entre 0 y 45.")
+            elif len(set(numeros_ingresados)) != 6:
+                st.error("No puedes repetir números. Cada número debe ser único.")
             else:
                 # Realizar control
                 data = st.session_state.current_data
-                resultados = controlar_boleta(numeros_ingresados, data, fecha_seleccionada)
+                resultados = controlar_boleta(
+                    numeros_ingresados,
+                    data,
+                    fecha_seleccionada,
+                    juego=st.session_state.juego_actual
+                )
                 
                 if resultados:
                     fecha_formateada = pd.Timestamp(resultados[0]['fecha']).strftime('%d/%m/%Y')
-                    dia_semana = "Miércoles" if pd.Timestamp(resultados[0]['fecha']).dayofweek == 2 else "Domingo"
-                    st.success(f"✅ Controlando contra los sorteos del {dia_semana} {fecha_formateada}")
+                    if es_quini:
+                        dia_semana = "Miércoles" if pd.Timestamp(resultados[0]['fecha']).dayofweek == 2 else "Domingo"
+                        st.success(f"Controlando contra los sorteos del {dia_semana} {fecha_formateada}")
+                    else:
+                        st.success(f"Controlando contra los sorteos del {fecha_formateada}")
                     
                     # Mostrar resultados en 4 tarjetas (2x2)
                     st.markdown("---")
@@ -2608,11 +3436,11 @@ def main():
                                     # Título de la modalidad con estilo simple
                                     st.markdown(f"""
                                     <h3 style="
-                                        color: #F2A100;
+                                        color: #2EC4B6;
                                         text-align: center;
                                         margin-bottom: 15px;
                                         padding-bottom: 10px;
-                                        border-bottom: 2px solid #F2A100;
+                                        border-bottom: 2px solid #2EC4B6;
                                     ">
                                         {resultado['modalidad']}
                                     </h3>
@@ -2637,15 +3465,15 @@ def main():
                                     # Mensaje según aciertos
                                     if resultado['aciertos'] >= 4:
                                         if resultado['aciertos'] == 6:
-                                            st.success("🎉 ¡FELICITACIONES! ¡Ganaste el premio mayor!")
+                                            st.success("¡Felicitaciones! Ganaste el premio mayor.")
                                         elif resultado['aciertos'] == 5:
-                                            st.success("🎊 ¡Excelente! ¡5 aciertos! ¡Premio importante!")
+                                            st.success("¡Excelente! 5 aciertos, premio importante.")
                                         else:
-                                            st.info("👏 ¡Bien hecho! Tienes premio.")
+                                            st.info("Bien hecho, tienes premio.")
                                     else:
                                         st.warning(f"No tienes premio. El mínimo para ganar en {resultado['modalidad']} son 4 aciertos.")
                 else:
-                    st.error("❌ No se pudieron obtener los resultados. Verifica que haya datos cargados.")
+                    st.error("No se pudieron obtener los resultados. Verifica que haya datos cargados.")
     
     # ========================================================================
     # TAB 3: ANÁLISIS
@@ -2805,9 +3633,9 @@ def main():
                 ideas_activas.append("IDEA #2 (Multi-Timeframe)")
             
             if ideas_activas:
-                st.info(f"✓ Se usarán: {', '.join(ideas_activas)}")
+                st.info(f"Se usarán: {', '.join(ideas_activas)}")
             else:
-                st.warning("⚠️ Ninguna IDEA activada en Parámetros → Avanzados")
+                st.warning("Ninguna IDEA activada en Parámetros > Avanzados")
         
         if st.button("Ejecutar Validación Walk-Forward", type="primary"):
             try:
@@ -2841,7 +3669,7 @@ def main():
                     
                     # Mostrar resultados
                     if usar_ideas_walkforward and ideas_activas:
-                        st.success(f"✓ Validación completada con {', '.join(ideas_activas)}")
+                        st.success(f"Validación completada con {', '.join(ideas_activas)}")
                     else:
                         st.success("Validación completada (sistema base)")
                     
@@ -2873,7 +3701,7 @@ def main():
                             y=plot_data['accuracies'],
                             mode='lines+markers',
                             name='Accuracy',
-                            line=dict(color='#F2A100', width=2),
+                            line=dict(color='#2EC4B6', width=2),
                             marker=dict(size=8)
                         ))
                         
@@ -2927,42 +3755,92 @@ def main():
     
     with tab6:
         st.markdown("## Historial de Predicciones")
-        
-        if len(st.session_state.historial) == 0:
-            st.info("No hay predicciones en el historial todavía. ¡Genera tu primera predicción!")
+
+        historial_filtrado = [
+            entry for entry in st.session_state.historial
+            if inferir_juego_historial(entry.get('juego', 'Quini 6')) == st.session_state.juego_actual
+        ]
+
+        if len(historial_filtrado) == 0:
+            st.info("No hay predicciones en el historial para este juego todavía.")
         else:
-            # Agrupar predicciones por timestamp (misma fecha/hora = misma sesión)
-            from collections import OrderedDict
-            grupos_historial = OrderedDict()
-            for i, entry in enumerate(st.session_state.historial):
-                ts = entry['timestamp']
-                if ts not in grupos_historial:
-                    grupos_historial[ts] = []
-                grupos_historial[ts].append(entry)
-            
-            for ts, entries in grupos_historial.items():
+            resultados_reales_cache = {}
+            for juego_key in [st.session_state.juego_actual]:
+                try:
+                    resultados_reales_cache[juego_key] = cargar_resultados_reales_historial(juego_key)
+                except Exception:
+                    resultados_reales_cache[juego_key] = None
+
+            grupos_historial = agrupar_historial_por_fecha(historial_filtrado)
+
+            for fecha, entries in grupos_historial.items():
                 n_preds = len(entries)
-                metodos = ', '.join([e['metodo'] for e in entries])
-                label = f"{ts} - {n_preds} prediccion{'es' if n_preds > 1 else ''}"
-                
+                label = f"{fecha} - {n_preds} prediccion{'es' if n_preds > 1 else ''}"
+
                 with st.expander(label):
                     for entry in entries:
-                        numeros_texto = ', '.join([f"{n:02d}" for n in entry['prediccion']])
-                        
+                        juego_entry = entry.get('juego', 'Quini 6')
+                        juego_key = inferir_juego_historial(juego_entry)
+
+                        evaluacion = evaluar_entry_historial_con_real(
+                            entry,
+                            resultados_reales_cache.get(juego_key)
+                        )
+
+                        coincidencias_map = {}
+                        if evaluacion and evaluacion.get('estado') == 'ok':
+                            coincidencias_map = {
+                                r.get('modalidad', ''): set(r.get('coincidencias', []))
+                                for r in evaluacion.get('resultados_modalidad', [])
+                            }
+
+                        modalidades_juego = obtener_config_juego(juego_key).get('modalidades', [])
+                        if not modalidades_juego:
+                            modalidades_juego = ['Modalidad 1', 'Modalidad 2', 'Modalidad 3', 'Modalidad 4']
+
+                        plus_entry = entry.get('numero_plus')
+
                         # Construir stats inline
                         stats_parts = []
-                        if 'suma_total' in entry['scores']:
+                        if 'scores' in entry and 'suma_total' in entry['scores']:
                             stats_parts.append(f"Suma: {entry['scores']['suma_total']}")
                             stats_parts.append(f"Score: {entry['scores']['score_promedio']:.3f}")
                             stats_parts.append(f"Pares: {entry['scores']['pares']}/6")
                         stats_texto = " &nbsp;|&nbsp; ".join(stats_parts)
-                        
+
+                        filas_modalidad_html = []
+                        for idx, modalidad in enumerate(modalidades_juego):
+                            coincidencias_modalidad = coincidencias_map.get(modalidad, set())
+
+                            numeros_html_parts = []
+                            for n in entry['prediccion']:
+                                if int(n) in coincidencias_modalidad:
+                                    numeros_html_parts.append(
+                                        f"<span style='display:inline-flex;align-items:center;justify-content:center;"
+                                        f"width:24px;height:24px;border-radius:50%;background:#2EC4B6;color:#fff;"
+                                        f"font-size:0.80rem;font-weight:700;margin-right:4px;'>{int(n):02d}</span>"
+                                    )
+                                else:
+                                    numeros_html_parts.append(f"<span>{int(n):02d}</span>")
+
+                            numeros_texto = "<span style='display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap;'>" + "".join(numeros_html_parts) + "</span>"
+                            if plus_entry is not None:
+                                numeros_texto += f" &nbsp;+&nbsp; <span style='color:#2EC4B6;font-weight:700;'>Plus: {plus_entry}</span>"
+
+                            stats_columna = stats_texto if idx == 0 else ""
+                            borde_fila = "border-bottom: 1px solid rgba(200,200,200,0.2);" if idx < len(modalidades_juego) - 1 else ""
+
+                            filas_modalidad_html.append(
+                                f"<div style='display:flex;align-items:center;gap:20px;padding:5px 0;{borde_fila}'>"
+                                f"<div style='min-width: 220px; font-weight: 600; color: #2EC4B6; font-size: 0.85rem;'>{juego_entry} - {entry['metodo']} - {modalidad}</div>"
+                                f"<div style='font-size: 0.95rem; min-width: 220px;'>{numeros_texto}</div>"
+                                f"<div style='color: #888; font-size: 0.82rem;'>{stats_columna}</div>"
+                                f"</div>"
+                            )
+
                         st.markdown(
-                            f"<div style='display: flex; align-items: center; gap: 20px; padding: 5px 0; "
-                            f"border-bottom: 1px solid rgba(200,200,200,0.3);'>"
-                            f"<div style='min-width: 160px; font-weight: 600; color: #F2A100; font-size: 0.85rem;'>{entry['metodo']}</div>"
-                            f"<div style='font-size: 0.95rem; min-width: 220px;'>{numeros_texto}</div>"
-                            f"<div style='color: #888; font-size: 0.82rem;'>{stats_texto}</div>"
+                            f"<div style='border-bottom: 1px solid rgba(200,200,200,0.3);'>"
+                            f"{''.join(filas_modalidad_html)}"
                             f"</div>",
                             unsafe_allow_html=True
                         )
@@ -3378,26 +4256,26 @@ def main():
             pct_pf = st.number_input("Porcentaje (%)", value=30.0, min_value=0.0, max_value=100.0, step=5.0, format="%.1f", key="pct_pf", label_visibility="collapsed")
         with col_pf2:
             st.markdown('<p style="margin-bottom: 0.3rem;">PF Tasa</p>', unsafe_allow_html=True)
-            tasa_pf = st.number_input("Tasa mensual (%)", value=7.0, min_value=0.0, max_value=50.0, step=0.5, format="%.2f", key="tasa_pf", label_visibility="collapsed")
+            tasa_pf = st.number_input("Tasa anual (%)", value=84.0, min_value=0.0, max_value=500.0, step=1.0, format="%.2f", key="tasa_pf", label_visibility="collapsed")
         
         with col_cer1:
             st.markdown('<p style="margin-bottom: 0.3rem;">FCI CER %</p>', unsafe_allow_html=True)
             pct_cer = st.number_input("Porcentaje (%)", value=30.0, min_value=0.0, max_value=100.0, step=5.0, format="%.1f", key="pct_cer", label_visibility="collapsed")
         with col_cer2:
             st.markdown('<p style="margin-bottom: 0.3rem;">FCI CER Tasa</p>', unsafe_allow_html=True)
-            tasa_cer = st.number_input("Tasa mensual (%)", value=3.5, min_value=0.0, max_value=50.0, step=0.5, format="%.2f", key="tasa_cer", label_visibility="collapsed")
+            tasa_cer = st.number_input("Tasa anual (%)", value=42.0, min_value=0.0, max_value=500.0, step=1.0, format="%.2f", key="tasa_cer", label_visibility="collapsed")
         
         with col_usd1:
             st.markdown('<p style="margin-bottom: 0.3rem;">FCI USD %</p>', unsafe_allow_html=True)
             pct_usd = st.number_input("Porcentaje (%)", value=40.0, min_value=0.0, max_value=100.0, step=5.0, format="%.1f", key="pct_usd", label_visibility="collapsed")
         with col_usd2:
             st.markdown('<p style="margin-bottom: 0.3rem;">FCI USD Tasa</p>', unsafe_allow_html=True)
-            tasa_usd = st.number_input("Tasa mensual (%)", value=0.5, min_value=0.0, max_value=50.0, step=0.5, format="%.2f", key="tasa_usd", label_visibility="collapsed")
+            tasa_usd = st.number_input("Tasa anual (%)", value=6.0, min_value=0.0, max_value=500.0, step=1.0, format="%.2f", key="tasa_usd", label_visibility="collapsed")
         
         # Validar que la suma de porcentajes sea 100%
         suma_pct = pct_pf + pct_cer + pct_usd
         if abs(suma_pct - 100.0) > 0.1:
-            st.warning(f"⚠️ La suma de porcentajes debe ser 100% (actual: {suma_pct:.1f}%)")
+            st.warning(f"La suma de porcentajes debe ser 100% (actual: {suma_pct:.1f}%)")
         
         # Limpiar gastos de meses que exceden el nuevo límite
         if st.session_state.gastos_portfolio:
@@ -3616,7 +4494,7 @@ def main():
             y=df_grafico_simple['Acumulado'],
             mode='lines+markers',
             name='Inversión Simple TNA',
-            line=dict(color='#F2A100', width=3),
+            line=dict(color='#2EC4B6', width=3),
             marker=dict(size=8)
         ))
         
@@ -3660,4 +4538,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
