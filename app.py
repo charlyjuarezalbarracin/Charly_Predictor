@@ -82,9 +82,14 @@ st.markdown("""
         background-color: #f8f9fa;
     }
 
+    /* Ocultar el header nativo de Streamlit para eliminar el espacio en blanco superior */
+    [data-testid="stHeader"] {
+        display: none;
+    }
+
     /* Reducir padding vertical general del contenedor principal */
     section[data-testid="stMain"] .block-container {
-        padding-top: 0.6rem;
+        padding-top: 0 !important;
         padding-bottom: 1rem;
     }
 
@@ -92,90 +97,92 @@ st.markdown("""
     .app-banner,
     .sidebar-banner {
         text-align: center;
-        padding: 16px 14px;
-        background: linear-gradient(135deg, #F2A100 0%, #E58E00 100%);
-        border-radius: 0;
-        margin: -1rem -1rem 0.9rem -1rem;
+        padding: 20px 16px;
+        background: linear-gradient(135deg, #1B2A4A 0%, #0F1B33 100%);
+        border-radius: 0 0 20px 20px;
+        margin: -1rem -1rem 1rem -1rem;
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        min-height: 112px;
+        min-height: 108px;
         position: relative;
+        box-shadow: 0 4px 14px rgba(27, 42, 74, 0.25);
     }
 
     .app-banner {
-        min-height: 120px;
-        padding-top: 60px;
-        padding-bottom: 10px;
+        min-height: 108px;
+        padding-top: 22px;
+        padding-bottom: 16px;
     }
 
     .banner-logo {
         background: white;
-        width: 38px;
-        height: 38px;
+        width: 36px;
+        height: 36px;
         border-radius: 11px;
-        margin: 0 auto 10px auto;
+        margin: 0 auto 8px auto;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 20px;
-        color: #F2A100;
+        font-size: 15px;
+        color: #2EC4B6;
         font-weight: 700;
+        letter-spacing: 0.5px;
         box-shadow: 0 3px 10px rgba(0,0,0,0.12);
     }
 
     .banner-title {
         color: white;
         margin: 0;
-        font-size: 20px;
+        font-size: 19px;
         font-weight: 700;
-        letter-spacing: 0.5px;
+        letter-spacing: 0.3px;
     }
 
     .banner-subtitle {
-        color: rgba(255,255,255,0.95);
-        margin: 6px 0 0 0;
-        font-size: 12px;
-        font-weight: 400;
+        display: inline-block;
+        color: white;
+        margin: 8px 0 0 0;
+        padding: 3px 12px;
+        background-color: rgba(255,255,255,0.18);
+        border-radius: 50px;
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.6px;
+        text-transform: uppercase;
     }
 
     .banner-fecha {
         position: absolute;
-        right: 20px;
-        bottom: 18px;
-        color: rgba(255,255,255,0.85);
-        font-size: 11px;
+        right: 18px;
+        bottom: 14px;
+        color: rgba(255,255,255,0.8);
+        font-size: 10.5px;
         font-weight: 400;
     }
 
-    /* Tamaños especificos por panel */
-    .app-banner .banner-title {
-        font-size: 22px !important;
-    }
-
-    .app-banner .banner-subtitle {
-        font-size: 18px !important;
-    }
-
+    /* Tamaños unificados: header y sidebar comparten la misma jerarquía */
+    .app-banner .banner-title,
     .sidebar-banner .banner-title {
-        font-size: 20px !important;
+        font-size: 19px !important;
     }
 
+    .app-banner .banner-subtitle,
     .sidebar-banner .banner-subtitle {
-        font-size: 12px !important;
+        font-size: 11px !important;
     }
     
-    /* Tarjetas de números predichos - Estilo Midasmind */
+    /* Tarjetas de números predichos - Estilo Charly */
     .numero-predicho {
-        background: linear-gradient(135deg, #F2A100 0%, #E58E00 100%);
+        background: linear-gradient(135deg, #2EC4B6 0%, #22A99C 100%);
         color: white;
         padding: 16px 12px;
         border-radius: 20px;
         text-align: center;
         font-size: 24px;
         font-weight: 700;
-        box-shadow: 0 2px 8px rgba(242, 161, 0, 0.3);
+        box-shadow: 0 2px 8px rgba(46, 196, 182, 0.3);
         margin: 0;
         border: none;
         width: 95px;
@@ -196,44 +203,63 @@ st.markdown("""
         padding: 16px 20px;
         border-radius: 20px;
         box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-        border-left: 4px solid #F2A100;
+        border-left: 4px solid #2EC4B6;
     }
     
     /* Tarjetas en sidebar */
     [data-testid="stSidebar"] .stat-card {
-        border-left-color: #F2A100;
+        border-left-color: #2EC4B6;
     }
     
-    /* Botones estilo Píldora Midasmind */
+    /* Botones secundarios - estilo píldora compacta (acción por defecto) */
     .stButton>button {
-        background: white;
-        color: #333333;
+        background: rgba(46, 196, 182, 0.08);
+        color: #1B2A4A;
         border-radius: 50px;
-        padding: 12px 24px;
-        border: 2px solid #F2A100;
+        padding: 9px 20px;
+        border: 1.5px solid #2EC4B6;
         font-weight: 600;
-        font-size: 15px;
-        transition: all 0.3s;
-        box-shadow: 0 2px 6px rgba(242, 161, 0, 0.15);
+        font-size: 0.85rem;
+        transition: all 0.2s;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
     }
     
     .stButton>button:hover {
-        background: #F2A100;
+        border-color: #22A99C;
+        color: #22A99C;
+        background: rgba(46, 196, 182, 0.18);
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    /* Botón primario - única acción destacada por pantalla (ej. Generar Predicción) */
+    .stButton>button[kind="primary"] {
+        background: linear-gradient(135deg, #2EC4B6 0%, #22A99C 100%);
         color: white;
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(242, 161, 0, 0.3);
+        border: none;
+        padding: 8px 18px;
+        font-weight: 700;
+        font-size: 0.85rem;
+        letter-spacing: 0.3px;
+        box-shadow: 0 2px 6px rgba(46, 196, 182, 0.35);
+    }
+
+    .stButton>button[kind="primary"]:hover {
+        background: linear-gradient(135deg, #22A99C 0%, #2EC4B6 100%);
+        color: white;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 10px rgba(46, 196, 182, 0.45);
     }
     
-    /* Headers - Estilo limpio Midasmind */
+    /* Headers - Estilo limpio Charly */
     h1 {
-        color: #333333 !important;
+        color: #1B2A4A !important;
         font-size: 2.2rem !important;
         margin-bottom: 0.5rem !important;
         font-weight: 700 !important;
     }
     
     h2 {
-        color: #333333 !important;
+        color: #1B2A4A !important;
         font-size: 1.5rem !important;
         margin-top: 0.8rem !important;
         margin-bottom: 0.5rem !important;
@@ -241,7 +267,7 @@ st.markdown("""
     }
     
     h3 {
-        color: #F2A100 !important;
+        color: #2EC4B6 !important;
         font-size: 1.1rem !important;
         margin-top: 0.5rem !important;
         margin-bottom: 0.2rem !important;
@@ -253,6 +279,8 @@ st.markdown("""
         color: #666666 !important;
         font-size: 0.95rem !important;
         font-weight: 500 !important;
+        margin-top: 0.6rem !important;
+        margin-bottom: 0.2rem !important;
     }
     
     /* Texto general */
@@ -262,10 +290,10 @@ st.markdown("""
         line-height: 1.6;
     }
     
-    /* Métricas - Estilo Midasmind */
+    /* Métricas - Estilo Charly */
     [data-testid="stMetricValue"] {
         font-size: 28px !important;
-        color: #F2A100 !important;
+        color: #2EC4B6 !important;
         font-weight: 700 !important;
     }
     
@@ -276,22 +304,22 @@ st.markdown("""
         letter-spacing: 0.5px;
     }
     
-    /* Sidebar - Estilo Midasmind */
+    /* Sidebar - Estilo Charly (azul marino oscuro) */
     [data-testid="stSidebar"] {
-        background-color: white !important;
+        background-color: #1B2A4A !important;
         border-radius: 0 30px 30px 0 !important;
         margin: 0 !important;
-        box-shadow: 4px 0 20px rgba(0,0,0,0.08);
+        box-shadow: 4px 0 20px rgba(0,0,0,0.15);
     }
     
     [data-testid="stSidebar"] > div:first-child {
-        background-color: white !important;
+        background-color: #1B2A4A !important;
         border-radius: 0 30px 30px 0 !important;
     }
     
     /* Botón de colapsar sidebar */
     [data-testid="collapsedControl"] {
-        background-color: #F2A100 !important;
+        background-color: #1B2A4A !important;
         border-radius: 0 15px 15px 0 !important;
     }
     
@@ -299,116 +327,131 @@ st.markdown("""
         color: white !important;
     }
     
-    /* Sidebar headers */
+    /* Sidebar headers - etiquetas de sección uniformes tipo tag */
     [data-testid="stSidebar"] h1 {
-        font-size: 1.3rem !important;
-        color: #333333 !important;
+        font-size: 1.15rem !important;
+        color: #FFFFFF !important;
         font-weight: 700 !important;
     }
     
-    [data-testid="stSidebar"] h2 {
-        font-size: 1.1rem !important;
-        color: #F2A100 !important;
-        font-weight: 600 !important;
-        margin-top: 0.6rem !important;
+    [data-testid="stSidebar"] h2,
+    [data-testid="stSidebar"] h3,
+    [data-testid="stSidebar"] h4,
+    [data-testid="stSidebar"] h5,
+    [data-testid="stSidebar"] h6 {
+        font-size: 0.75rem !important;
+        color: #8B96AC !important;
+        font-weight: 700 !important;
+        text-transform: uppercase;
+        letter-spacing: 0.6px;
+        margin-top: 1rem !important;
+        margin-bottom: 0.4rem !important;
     }
     
-    [data-testid="stSidebar"] h3 {
-        font-size: 1rem !important;
-        color: #333333 !important;
-        font-weight: 600 !important;
-    }
-    
-    /* Sidebar labels y texto */
-    [data-testid="stSidebar"] label {
-        color: #666666 !important;
-        font-weight: 500 !important;
-        font-size: 0.9rem !important;
-    }
-    
+    /* Sidebar labels y texto - mismo tamaño para todo el texto general */
+    [data-testid="stSidebar"] label,
     [data-testid="stSidebar"] p {
-        color: #666666 !important;
+        color: #C9D3E0 !important;
+        font-weight: 500 !important;
+        font-size: 0.72rem !important;
+    }
+    
+    /* Sidebar - texto general suelto (captions, spinner, markdown sin etiqueta) */
+    [data-testid="stSidebar"] [data-testid="stMarkdownContainer"],
+    [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] div,
+    [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] span,
+    [data-testid="stSidebar"] [data-testid="stCaptionContainer"],
+    [data-testid="stSidebar"] [data-testid="stSpinner"] {
+        color: #C9D3E0;
     }
     
     /* Sidebar divisores */
     [data-testid="stSidebar"] hr {
         margin: 0.5rem 0 !important;
         border: none !important;
-        border-top: 1px solid #f0f0f0 !important;
+        border-top: 1px solid rgba(255,255,255,0.12) !important;
     }
     
     /* Sidebar - Botones estilo Píldora */
     [data-testid="stSidebar"] .stButton>button {
-        background: white;
-        color: #333333;
+        background: rgba(46, 196, 182, 0.12);
+        color: #FFFFFF;
         border-radius: 50px;
-        padding: 8px 12px;
-        border: 2px solid #F2A100;
+        padding: 8px 14px;
+        border: 1.5px solid #2EC4B6;
         font-weight: 600;
-        font-size: 14px;
+        font-size: 0.85rem;
         transition: all 0.3s;
         width: 100%;
-        box-shadow: 0 2px 6px rgba(242, 161, 0, 0.12);
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
     }
     
     [data-testid="stSidebar"] .stButton>button:hover {
-        background: #F2A100;
-        color: white;
+        background: #2EC4B6;
+        color: #0F1B33;
         transform: translateY(-1px);
-        box-shadow: 0 4px 12px rgba(242, 161, 0, 0.25);
+        box-shadow: 0 4px 12px rgba(46, 196, 182, 0.35);
     }
     
-    /* Sidebar - Radio buttons estilo limpio */
+    /* Sidebar - Radio buttons estilo chip uniforme */
     [data-testid="stSidebar"] [data-baseweb="radio"] > div {
-        gap: 0.35rem;
+        gap: 0.4rem;
     }
     
     [data-testid="stSidebar"] [data-baseweb="radio"] label {
-        padding: 6px 10px;
+        padding: 7px 14px;
         border-radius: 50px;
         transition: all 0.2s;
-        border: 1px solid transparent;
+        border: 1.5px solid rgba(255,255,255,0.15);
+        background-color: transparent;
     }
     
     [data-testid="stSidebar"] [data-baseweb="radio"] label:hover {
-        background-color: rgba(242, 161, 0, 0.08);
-        border-color: #F2A100;
+        background-color: rgba(46, 196, 182, 0.15);
+        border-color: #2EC4B6;
+    }
+
+    [data-testid="stSidebar"] [data-baseweb="radio"] label,
+    [data-testid="stSidebar"] [data-baseweb="radio"] label p,
+    [data-testid="stSidebar"] [data-baseweb="radio"] label span,
+    [data-testid="stSidebar"] [data-baseweb="radio"] label div {
+        font-size: 0.72rem !important;
     }
     
-    /* Sidebar - Expander estilo Midasmind */
+    /* Sidebar - Expander estilo Charly */
     [data-testid="stSidebar"] .streamlit-expanderHeader {
-        background-color: rgba(242, 161, 0, 0.06);
+        background-color: rgba(46, 196, 182, 0.1);
         border-radius: 15px;
         font-weight: 600;
         padding: 6px 10px;
-        border: 1px solid rgba(242, 161, 0, 0.2);
+        border: 1px solid rgba(46, 196, 182, 0.3);
     }
     
     [data-testid="stSidebar"] .streamlit-expanderHeader:hover {
-        background-color: rgba(242, 161, 0, 0.12);
-        border-color: #F2A100;
+        background-color: rgba(46, 196, 182, 0.18);
+        border-color: #2EC4B6;
     }
     
-    /* Sidebar - Sliders con color dorado */
+    /* Sidebar - Sliders con color teal */
     [data-testid="stSidebar"] .stSlider > div > div > div {
-        background-color: #F2A100;
+        background-color: #2EC4B6;
     }
     
     /* Mensajes de info/success/warning */
     [data-testid="stSidebar"] .stAlert {
         padding: 6px 10px;
         border-radius: 15px;
-        font-size: 0.75rem;
+        font-size: 0.72rem;
         border: none;
     }
 
     [data-testid="stSidebar"] .stAlert p {
-        font-size: 0.75rem !important;
+        font-size: 0.72rem !important;
     }
 
     /* Sidebar - Compactar contenedores */
     [data-testid="stSidebar"] .block-container {
-        padding-top: 0.6rem;
+        padding-top: 0 !important;
         padding-bottom: 0.6rem;
     }
 
@@ -416,7 +459,7 @@ st.markdown("""
         margin-bottom: 0.35rem !important;
     }
     
-    /* Tabs - Estilo Píldora Midasmind */
+    /* Tabs - Estilo Píldora Charly */
     .stTabs [data-baseweb="tab-list"] {
         background-color: transparent;
         gap: 0.8rem;
@@ -429,20 +472,23 @@ st.markdown("""
         font-weight: 600;
         padding: 0.8rem 1.5rem;
         border-radius: 50px;
-        border: 2px solid transparent;
-        background-color: white;
+        border: 1.5px solid #2EC4B6;
+        background-color: rgba(46, 196, 182, 0.08);
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
         transition: all 0.3s;
     }
     
     .stTabs [data-baseweb="tab"]:hover {
-        border-color: #F2A100;
-        color: #F2A100;
+        border-color: #22A99C;
+        color: #22A99C;
+        background-color: rgba(46, 196, 182, 0.18);
     }
     
     .stTabs [data-baseweb="tab"][aria-selected="true"] {
-        background-color: #F2A100;
+        background-color: #2EC4B6;
         color: white;
-        border-color: #F2A100;
+        border-color: #2EC4B6;
+        box-shadow: 0 2px 6px rgba(46, 196, 182, 0.35);
     }
     
     /* Dataframes y tablas */
@@ -491,7 +537,7 @@ st.markdown("""
         box-shadow: none !important;
     }
     
-    /* Inputs y selectbox estilo Midasmind */
+    /* Inputs y selectbox estilo Charly */
     input, select, textarea {
         border-radius: 50px !important;
         border: 2px solid #e0e0e0 !important;
@@ -499,8 +545,8 @@ st.markdown("""
     }
     
     input:focus, select:focus, textarea:focus {
-        border-color: #F2A100 !important;
-        box-shadow: 0 0 0 3px rgba(242, 161, 0, 0.1) !important;
+        border-color: #2EC4B6 !important;
+        box-shadow: 0 0 0 3px rgba(46, 196, 182, 0.15) !important;
     }
     
     /* Mensajes Success/Info/Warning - Estilo Midasmind con mayor especificidad */
@@ -509,11 +555,11 @@ st.markdown("""
     [data-testid="stNotification"], 
     div[data-baseweb="notification"],
     .stAlertContainer {
-        border-radius: 20px !important;
-        padding: 10px 16px !important;
-        border-width: 2px !important;
+        border-radius: 10px !important;
+        padding: 7px 14px !important;
+        border-width: 1.5px !important;
         border-style: solid !important;
-        font-size: 0.9rem !important;
+        font-size: 0.82rem !important;
         font-weight: 500 !important;
         min-height: auto !important;
     }
@@ -533,19 +579,19 @@ st.markdown("""
         color: #2E7D32 !important;
     }
     
-    /* Info - Dorado Midasmind */
+    /* Info - Teal Charly */
     [data-testid="stAlertContainer"][class*="info"],
     .stInfo,
     div[data-baseweb="notification"][kind="info"],
     [data-testid="stNotification"][kind="info"] {
-        background-color: rgba(242, 161, 0, 0.08) !important;
-        border-color: #F2A100 !important;
-        color: #E58E00 !important;
+        background-color: rgba(46, 196, 182, 0.1) !important;
+        border-color: #2EC4B6 !important;
+        color: #1F8377 !important;
     }
     
     [data-testid="stAlertContainer"][class*="info"] *,
     .stInfo * {
-        color: #E58E00 !important;
+        color: #1F8377 !important;
     }
     
     /* Warning - Naranja */
@@ -586,12 +632,12 @@ st.markdown("""
         background: transparent !important;
     }
     
-    /* Bloque de código estilo Midasmind */
+    /* Bloque de código estilo Charly */
     .stCodeBlock, 
     pre,
     [data-testid="stCode"] {
         border-radius: 15px !important;
-        border: 2px solid #F2A100 !important;
+        border: 2px solid #2EC4B6 !important;
         background-color: white !important;
         padding: 16px !important;
     }
@@ -635,12 +681,12 @@ st.markdown("""
     
     /* Info - sobrescribir TODO */
     div[data-testid="stAlertContainer"]:has([data-testid="stAlertContentInfo"]) {
-        background-color: rgba(242, 161, 0, 0.08) !important;
-        border: 2px solid #F2A100 !important;
+        background-color: rgba(46, 196, 182, 0.1) !important;
+        border: 2px solid #2EC4B6 !important;
     }
     
     div[data-testid="stAlertContainer"]:has([data-testid="stAlertContentInfo"]) * {
-        color: #E58E00 !important;
+        color: #1F8377 !important;
     }
     
     /* Warning - sobrescribir TODO */
@@ -715,8 +761,8 @@ st.markdown("""
     }
 
     .pozo-card {
-        background: linear-gradient(135deg, rgba(242, 161, 0, 0.08) 0%, rgba(229, 142, 0, 0.08) 100%);
-        border: 2px solid #F2A100;
+        background: linear-gradient(135deg, rgba(46, 196, 182, 0.08) 0%, rgba(34, 169, 156, 0.08) 100%);
+        border: 2px solid #2EC4B6;
         border-radius: 12px;
         padding: 12px;
         text-align: center;
@@ -731,7 +777,7 @@ st.markdown("""
     }
 
     .pozo-valor {
-        color: #F2A100;
+        color: #2EC4B6;
         font-size: 1.1rem;
         font-weight: 700;
     }
@@ -767,6 +813,13 @@ st.markdown("""
     [data-testid="stExpander"] summary {
         font-size: 0.85rem !important;
         font-weight: 500 !important;
+    }
+
+    /* Sidebar - mismo tamaño de texto general para checkbox, slider y expander (mayor especificidad que las reglas globales de arriba) */
+    [data-testid="stSidebar"] .stCheckbox label,
+    [data-testid="stSidebar"] .stSlider label,
+    [data-testid="stSidebar"] [data-testid="stExpander"] summary {
+        font-size: 0.72rem !important;
     }
     
     /* Deshabilitar input de búsqueda en selectbox - solo selección con mouse/teclado */
@@ -1663,10 +1716,10 @@ def mostrar_analisis_regresion_equilibrio(regression_analyzer):
     hay_desequilibrios = any(deseq.values())
     
     if not hay_desequilibrios:
-        st.info("âœ“ No se detectaron desequilibrios significativos. Sistema en equilibrio normal.")
+        st.info("No se detectaron desequilibrios significativos. Sistema en equilibrio normal.")
         return
     
-    st.warning("âš ï¸ Desequilibrios detectados - Sistema aplicará correcciones automáticas")
+    st.warning("Desequilibrios detectados. El sistema aplicará correcciones automáticas.")
     
     corr = summary['correcciones_aplicar']
     metricas = summary['metricas']
@@ -1681,10 +1734,10 @@ def mostrar_analisis_regresion_equilibrio(regression_analyzer):
             st.markdown("Pares/Impares")
             st.markdown(f"Desbalance: {desbalance_pct:.1f}%")
             if corr['paridad']:
-                st.markdown(f"â†’ {corr['paridad'].replace('_', ' ').title()}")
+                st.markdown(f"→ {corr['paridad'].replace('_', ' ').title()}")
         else:
             st.markdown("Pares/Impares")
-            st.markdown("âœ“ En equilibrio")
+            st.markdown("En equilibrio")
     
     # Suma
     with cols[1]:
@@ -1693,12 +1746,12 @@ def mostrar_analisis_regresion_equilibrio(regression_analyzer):
             st.markdown("Suma Total")
             st.markdown(f"Z-Score: {z_score:+.2f}Ïƒ")
             if corr['suma']:
-                st.markdown(f"â†’ {corr['suma'].replace('_', ' ').title()}")
+                st.markdown(f"→ {corr['suma'].replace('_', ' ').title()}")
                 if metricas['suma_objetivo']:
                     st.markdown(f"Objetivo: ~{metricas['suma_objetivo']:.0f}")
         else:
             st.markdown("Suma Total")
-            st.markdown("âœ“ En equilibrio")
+            st.markdown("En equilibrio")
     
     # Rangos
     with cols[2]:
@@ -1709,7 +1762,7 @@ def mostrar_analisis_regresion_equilibrio(regression_analyzer):
                 st.markdown(f"{rango_nombre}: {accion}")
         else:
             st.markdown("Rangos")
-            st.markdown("âœ“ En equilibrio")
+            st.markdown("En equilibrio")
 
 
 def mostrar_analisis_resonancia_ciclos(cycle_resonance_analyzer):
@@ -1869,7 +1922,7 @@ def crear_grafico_frecuencias(freq_analyzer):
         y='Frecuencia',
         title='Frecuencia de Aparición de Números',
         color='Frecuencia',
-        color_continuous_scale=[[0, '#FFF8E1'], [0.5, '#FFD54F'], [1, '#F2A100']]
+        color_continuous_scale=[[0, '#E0F7F5'], [0.5, '#7FDCD3'], [1, '#2EC4B6']]
     )
     
     fig.update_layout(
@@ -1899,7 +1952,7 @@ def crear_grafico_calientes_frios(freq_analyzer):
     colores = []
     for n in todos_numeros:
         if n in calientes:
-            colores.append('#F2A100')  # Naranja para calientes
+            colores.append('#2EC4B6')  # Teal para calientes
         elif n in frios:
             colores.append('#BDBDBD')  # Gris para fríos
         else:
@@ -1939,7 +1992,7 @@ def crear_grafico_tendencias(freq_analyzer):
     items = sorted(tendencias.items(), key=lambda x: abs(x[1]), reverse=True)[:15]
     numeros = [str(n) for n, _ in items]
     valores = [t for _, t in items]
-    colores = ['#F2A100' if v > 0 else '#BDBDBD' for v in valores]
+    colores = ['#2EC4B6' if v > 0 else '#BDBDBD' for v in valores]
     
     fig = go.Figure(go.Bar(
         x=valores,
@@ -2014,7 +2067,8 @@ def predecir_numero_plus(csv_path: str) -> dict:
 
 def mostrar_numeros_predichos(numeros, titulo="Predicción"):
     """Mostrar números predichos en formato visual atractivo"""
-    st.markdown(f"### {titulo}")
+    if titulo:
+        st.markdown(f"### {titulo}")
     
     # Convertir a lista de enteros para manejar tipos numpy
     numeros_limpios = [int(n) for n in numeros]
@@ -2145,15 +2199,15 @@ def mostrar_portfolio(portfolio, freq_analyzer, portfolio_gen, metodo_nombre, nu
         for num in numeros:
             mom = momentum_results.get(num, 0)
             if mom > 0.3:
-                indicador = "â†‘"
+                indicador = "↑"
             elif mom < -0.3:
-                indicador = "â†“"
+                indicador = "↓"
             else:
                 indicador = ""
             
             numeros_html_parts.append(
                 f"<div style='text-align: center; padding: 12px 8px; "
-                f"background: linear-gradient(135deg, #F2A100 0%, #E58E00 100%); "
+                f"background: linear-gradient(135deg, #2EC4B6 0%, #22A99C 100%); "
                 f"border-radius: 20px; width: 95px;'>"
                 f"<span style='font-size: 20px; font-weight: bold; color: white;'>{int(num):02d}</span>"
                 f"<span style='font-size: 12px; color: white;'> {indicador}</span>"
@@ -2203,11 +2257,11 @@ def mostrar_portfolio(portfolio, freq_analyzer, portfolio_gen, metodo_nombre, nu
         f"<div style='display: flex; gap: 40px; margin: 10px 0 15px 0;'>"
         f"<div>"
         f"<div style='color: #666; text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.5px; margin-bottom: 5px;'>NÚMEROS ÚNICOS TOTALES</div>"
-        f"<div style='color: #F2A100; font-size: 1.75rem; font-weight: 700;'>{coverage['numeros_unicos']}</div>"
+        f"<div style='color: #2EC4B6; font-size: 1.75rem; font-weight: 700;'>{coverage['numeros_unicos']}</div>"
         f"</div>"
         f"<div>"
         f"<div style='color: #666; text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.5px; margin-bottom: 5px;'>SCORE DE DIVERSIFICACIÓN</div>"
-        f"<div style='color: #F2A100; font-size: 1.75rem; font-weight: 700;'>{coverage['diversificacion_score']:.2%}</div>"
+        f"<div style='color: #2EC4B6; font-size: 1.75rem; font-weight: 700;'>{coverage['diversificacion_score']:.2%}</div>"
         f"</div>"
         f"</div>",
         unsafe_allow_html=True
@@ -2420,7 +2474,7 @@ def main():
         
         # Banner informativo de configuración optimizada
         # st.info("""
-        # âœ¨ **Configuración Optimizada Activa** | Rendimiento: 2.25 aciertos/sorteo promedio  
+        # Configuración Optimizada Activa | Rendimiento: 2.25 aciertos/sorteo promedio
         # Los parámetros predeterminados han sido optimizados mediante 130+ pruebas de configuración.
         # """)
         
@@ -2825,7 +2879,7 @@ def main():
         # Botón de generar predicción
         st.markdown("## Generar Predicción")
         
-        col_btn1, col_btn2, col_btn3 = st.columns([2, 1, 1])
+        col_btn1, col_btn2 = st.columns([1, 3])
         
         with col_btn1:
             texto_boton = "GENERAR PREDICCIONES" if usar_portfolio and n_combinaciones > 1 else "GENERAR PREDICCIÓN"
@@ -2902,7 +2956,7 @@ def main():
                     st.markdown("### Número plus sugerido - Loto")
                     st.markdown(
                         f'<div style="display:flex;gap:12px;align-items:center;margin-bottom:0.5rem;">'
-                        f'<div class="numero-predicho" style="background:#F2A100;color:#1a1a1a;font-weight:700;font-size:1.3rem;'
+                        f'<div class="numero-predicho" style="background:#2EC4B6;color:#0F1B33;font-weight:700;font-size:1.3rem;'
                         f'width:48px;height:48px;display:flex;align-items:center;justify-content:center;border-radius:50%;">'
                         f'{_plus_loto}</div>'
                         f'<span style="color:#888;font-size:0.85rem;">Alternativas: {_plus_top3[1]} · {_plus_top3[2]}</span>'
@@ -2967,44 +3021,42 @@ def main():
                     
                     # Mostrar resultados según método
                     if metodo == GenerationStrategy.BOTH:
-                        # AMBOS MÉTODOS
-                        col1, col2 = st.columns(2)
+                        # AMBOS MÉTODOS - uno debajo del otro
+                        st.markdown("### Método Estándar")
+                        mostrar_numeros_predichos(
+                            result['standard']['combination'],
+                            ""
+                        )
                         
-                        with col1:
-                            st.markdown("### Método Estándar")
-                            mostrar_numeros_predichos(
-                                result['standard']['combination'],
-                                ""
-                            )
-                            
-                            st.markdown("##### Estadísticas")
-                            analysis_std = result['standard']['analysis']
-                            
-                            subcol1, subcol2, subcol3 = st.columns(3)
-                            with subcol1:
-                                st.metric("Suma", analysis_std['suma_total'])
-                            with subcol2:
-                                st.metric("Score", f"{analysis_std['score_promedio']:.3f}")
-                            with subcol3:
-                                st.metric("Pares", f"{analysis_std['pares']}/6")
+                        st.markdown("##### Estadísticas")
+                        analysis_std = result['standard']['analysis']
                         
-                        with col2:
-                            st.markdown("### Método Condicional")
-                            mostrar_numeros_predichos(
-                                result['conditional']['combination'],
-                                ""
-                            )
-                            
-                            st.markdown("##### Estadísticas")
-                            analysis_cond = result['conditional']['analysis']
-                            
-                            subcol1, subcol2, subcol3 = st.columns(3)
-                            with subcol1:
-                                st.metric("Suma", analysis_cond['suma_total'])
-                            with subcol2:
-                                st.metric("Score", f"{analysis_cond['score_promedio']:.3f}")
-                            with subcol3:
-                                st.metric("Correlation", f"{analysis_cond['correlation_score']:.3f}")
+                        subcol1, subcol2, subcol3, _ = st.columns([1, 1, 1, 3])
+                        with subcol1:
+                            st.metric("Suma", analysis_std['suma_total'])
+                        with subcol2:
+                            st.metric("Score", f"{analysis_std['score_promedio']:.3f}")
+                        with subcol3:
+                            st.metric("Pares", f"{analysis_std['pares']}/6")
+                        
+                        st.markdown("---")
+                        
+                        st.markdown("### Método Condicional")
+                        mostrar_numeros_predichos(
+                            result['conditional']['combination'],
+                            ""
+                        )
+                        
+                        st.markdown("##### Estadísticas")
+                        analysis_cond = result['conditional']['analysis']
+                        
+                        subcol1, subcol2, subcol3, _ = st.columns([1, 1, 1, 3])
+                        with subcol1:
+                            st.metric("Suma", analysis_cond['suma_total'])
+                        with subcol2:
+                            st.metric("Score", f"{analysis_cond['score_promedio']:.3f}")
+                        with subcol3:
+                            st.metric("Correlation", f"{analysis_cond['correlation_score']:.3f}")
                         
                         # Agregar ambas al historial
                         sufijo_opt = " + Optimizer" if usar_optimizer else ""
@@ -3030,7 +3082,7 @@ def main():
                         mostrar_numeros_predichos(prediccion_rapida['numeros'], "")
                         
                         st.markdown("##### Estadísticas")
-                        subcol1, subcol2, subcol3 = st.columns(3)
+                        subcol1, subcol2, subcol3, _ = st.columns([1, 1, 1, 3])
                         with subcol1:
                             st.metric("Suma", prediccion_rapida['suma'])
                         with subcol2:
@@ -3061,7 +3113,7 @@ def main():
                         analysis = result['analysis']
                         
                         # Métricas
-                        col1, col2, col3, col4, col5 = st.columns(5)
+                        col1, col2, col3, col4, col5, _ = st.columns([1, 1, 1, 1, 1, 2])
                         
                         with col1:
                             st.metric("Suma Total", analysis['suma_total'])
@@ -3143,7 +3195,7 @@ def main():
                         st.markdown("### Número plus sugerido - Loto")
                         st.markdown(
                             f'<div style="display:flex;gap:12px;align-items:center;margin-bottom:0.5rem;">'
-                            f'<div class="numero-predicho" style="background:#F2A100;color:#1a1a1a;font-weight:700;font-size:1.3rem;'
+                            f'<div class="numero-predicho" style="background:#2EC4B6;color:#0F1B33;font-weight:700;font-size:1.3rem;'
                             f'width:48px;height:48px;display:flex;align-items:center;justify-content:center;border-radius:50%;">'
                             f'{_plus_loto}</div>'
                             f'<span style="color:#888;font-size:0.85rem;">Alternativas: {_plus_top3[1]} · {_plus_top3[2]}</span>'
@@ -3291,7 +3343,7 @@ def main():
             box-sizing: border-box !important;
         }
         div[role="tabpanel"][id*="tabpanel-1"] [data-testid="stTextInput"] input:focus {
-            border: 3px solid #F2A100 !important;
+            border: 3px solid #2EC4B6 !important;
             outline: none !important;
         }
         div[role="tabpanel"][id*="tabpanel-1"] [data-testid="stTextInput"] label {
@@ -3349,9 +3401,9 @@ def main():
         if verificar:
             # Validar que no haya números repetidos
             if any(n is None for n in numeros_ingresados):
-                st.warning("âš ï¸ Por favor completa los 6 números con valores entre 0 y 45.")
+                st.warning("Por favor completa los 6 números con valores entre 0 y 45.")
             elif len(set(numeros_ingresados)) != 6:
-                st.error("âš ï¸ No puedes repetir números. Cada número debe ser único.")
+                st.error("No puedes repetir números. Cada número debe ser único.")
             else:
                 # Realizar control
                 data = st.session_state.current_data
@@ -3366,9 +3418,9 @@ def main():
                     fecha_formateada = pd.Timestamp(resultados[0]['fecha']).strftime('%d/%m/%Y')
                     if es_quini:
                         dia_semana = "Miércoles" if pd.Timestamp(resultados[0]['fecha']).dayofweek == 2 else "Domingo"
-                        st.success(f"âœ… Controlando contra los sorteos del {dia_semana} {fecha_formateada}")
+                        st.success(f"Controlando contra los sorteos del {dia_semana} {fecha_formateada}")
                     else:
-                        st.success(f"âœ… Controlando contra los sorteos del {fecha_formateada}")
+                        st.success(f"Controlando contra los sorteos del {fecha_formateada}")
                     
                     # Mostrar resultados en 4 tarjetas (2x2)
                     st.markdown("---")
@@ -3384,11 +3436,11 @@ def main():
                                     # Título de la modalidad con estilo simple
                                     st.markdown(f"""
                                     <h3 style="
-                                        color: #F2A100;
+                                        color: #2EC4B6;
                                         text-align: center;
                                         margin-bottom: 15px;
                                         padding-bottom: 10px;
-                                        border-bottom: 2px solid #F2A100;
+                                        border-bottom: 2px solid #2EC4B6;
                                     ">
                                         {resultado['modalidad']}
                                     </h3>
@@ -3413,15 +3465,15 @@ def main():
                                     # Mensaje según aciertos
                                     if resultado['aciertos'] >= 4:
                                         if resultado['aciertos'] == 6:
-                                            st.success("ðŸŽ‰ Â¡FELICITACIONES! Â¡Ganaste el premio mayor!")
+                                            st.success("¡Felicitaciones! Ganaste el premio mayor.")
                                         elif resultado['aciertos'] == 5:
-                                            st.success("ðŸŽŠ Â¡Excelente! Â¡5 aciertos! Â¡Premio importante!")
+                                            st.success("¡Excelente! 5 aciertos, premio importante.")
                                         else:
-                                            st.info("ðŸ‘ Â¡Bien hecho! Tienes premio.")
+                                            st.info("Bien hecho, tienes premio.")
                                     else:
                                         st.warning(f"No tienes premio. El mínimo para ganar en {resultado['modalidad']} son 4 aciertos.")
                 else:
-                    st.error("âŒ No se pudieron obtener los resultados. Verifica que haya datos cargados.")
+                    st.error("No se pudieron obtener los resultados. Verifica que haya datos cargados.")
     
     # ========================================================================
     # TAB 3: ANÁLISIS
@@ -3581,9 +3633,9 @@ def main():
                 ideas_activas.append("IDEA #2 (Multi-Timeframe)")
             
             if ideas_activas:
-                st.info(f"âœ“ Se usarán: {', '.join(ideas_activas)}")
+                st.info(f"Se usarán: {', '.join(ideas_activas)}")
             else:
-                st.warning("âš ï¸ Ninguna IDEA activada en Parámetros â†’ Avanzados")
+                st.warning("Ninguna IDEA activada en Parámetros > Avanzados")
         
         if st.button("Ejecutar Validación Walk-Forward", type="primary"):
             try:
@@ -3617,7 +3669,7 @@ def main():
                     
                     # Mostrar resultados
                     if usar_ideas_walkforward and ideas_activas:
-                        st.success(f"âœ“ Validación completada con {', '.join(ideas_activas)}")
+                        st.success(f"Validación completada con {', '.join(ideas_activas)}")
                     else:
                         st.success("Validación completada (sistema base)")
                     
@@ -3649,7 +3701,7 @@ def main():
                             y=plot_data['accuracies'],
                             mode='lines+markers',
                             name='Accuracy',
-                            line=dict(color='#F2A100', width=2),
+                            line=dict(color='#2EC4B6', width=2),
                             marker=dict(size=8)
                         ))
                         
@@ -3765,7 +3817,7 @@ def main():
                                 if int(n) in coincidencias_modalidad:
                                     numeros_html_parts.append(
                                         f"<span style='display:inline-flex;align-items:center;justify-content:center;"
-                                        f"width:24px;height:24px;border-radius:50%;background:#2e7d32;color:#fff;"
+                                        f"width:24px;height:24px;border-radius:50%;background:#2EC4B6;color:#fff;"
                                         f"font-size:0.80rem;font-weight:700;margin-right:4px;'>{int(n):02d}</span>"
                                     )
                                 else:
@@ -3773,14 +3825,14 @@ def main():
 
                             numeros_texto = "<span style='display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap;'>" + "".join(numeros_html_parts) + "</span>"
                             if plus_entry is not None:
-                                numeros_texto += f" &nbsp;+&nbsp; <span style='color:#F2A100;font-weight:700;'>Plus: {plus_entry}</span>"
+                                numeros_texto += f" &nbsp;+&nbsp; <span style='color:#2EC4B6;font-weight:700;'>Plus: {plus_entry}</span>"
 
                             stats_columna = stats_texto if idx == 0 else ""
                             borde_fila = "border-bottom: 1px solid rgba(200,200,200,0.2);" if idx < len(modalidades_juego) - 1 else ""
 
                             filas_modalidad_html.append(
                                 f"<div style='display:flex;align-items:center;gap:20px;padding:5px 0;{borde_fila}'>"
-                                f"<div style='min-width: 220px; font-weight: 600; color: #F2A100; font-size: 0.85rem;'>{juego_entry} - {entry['metodo']} - {modalidad}</div>"
+                                f"<div style='min-width: 220px; font-weight: 600; color: #2EC4B6; font-size: 0.85rem;'>{juego_entry} - {entry['metodo']} - {modalidad}</div>"
                                 f"<div style='font-size: 0.95rem; min-width: 220px;'>{numeros_texto}</div>"
                                 f"<div style='color: #888; font-size: 0.82rem;'>{stats_columna}</div>"
                                 f"</div>"
@@ -4223,7 +4275,7 @@ def main():
         # Validar que la suma de porcentajes sea 100%
         suma_pct = pct_pf + pct_cer + pct_usd
         if abs(suma_pct - 100.0) > 0.1:
-            st.warning(f"âš ï¸ La suma de porcentajes debe ser 100% (actual: {suma_pct:.1f}%)")
+            st.warning(f"La suma de porcentajes debe ser 100% (actual: {suma_pct:.1f}%)")
         
         # Limpiar gastos de meses que exceden el nuevo límite
         if st.session_state.gastos_portfolio:
@@ -4442,7 +4494,7 @@ def main():
             y=df_grafico_simple['Acumulado'],
             mode='lines+markers',
             name='Inversión Simple TNA',
-            line=dict(color='#F2A100', width=3),
+            line=dict(color='#2EC4B6', width=3),
             marker=dict(size=8)
         ))
         

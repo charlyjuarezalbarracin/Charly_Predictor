@@ -3,7 +3,7 @@
 ## 🚫 NO Hacer
 - NO agregar emojis/íconos a botones, labels o elementos de UI
 - NO agregar emojis/íconos en labels, checkboxes, radio buttons, o cualquier elemento visual
-- NO usar colores que se salgan del diseño actual (tema Midasmind)
+- NO usar colores que se salgan del diseño actual (tema Charly: azul marino #1B2A4A + teal #2EC4B6)
 - NO crear archivos markdown de documentación/resumen después de cada cambio
 - NO ofrecer opción "Datos de Muestra" en la interfaz
 - NO agregar elementos decorativos, textos de ayuda, expanders o secciones que no sean estrictamente necesarios
@@ -19,7 +19,7 @@
 - Sistema serio de predicción, NO es un proyecto de estudiante ni demo
 - Interfaz limpia, sin decoraciones innecesarias
 - Solo texto plano en labels y botones
-- Mantener coherencia con paleta de colores existente: #F2A100 (naranja Midasmind), grises neutros
+- Mantener coherencia con paleta de colores existente: #1B2A4A (azul marino, sidebar/headers), #2EC4B6 (teal, acentos/botones/activos), grises neutros
 - Evitar iconos decorativos, símbolos, o formateos excesivos en la UI
 - Priorizar claridad y funcionalidad sobre estética visual
 - Solo agregar elementos estrictamente necesarios para el funcionamiento
@@ -144,7 +144,7 @@ OPTIMAL_STRATEGY = 'BOTH'
 - **Nota:** El "2.25/sorteo" previo fue overfitting en 4 sorteos - NO representativo
 - 130+ configuraciones probadas
 - Interfaz web con Streamlit
-- Tema Midasmind (naranja #F2A100)
+- Tema Charly (azul marino #1B2A4A + teal #2EC4B6)
 
 **Estructura del CSV Histórico (quini6_historico.csv):**
 - **Formato:** Cada fila = 1 sorteo
