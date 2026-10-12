@@ -3531,6 +3531,46 @@ def main():
         col1, col2 = st.columns([1, 1])
         with col1:
             st.dataframe(pares_df, width='stretch', hide_index=True)
+
+        if st.session_state.juego_actual == 'loto':
+            st.markdown("---")
+            st.markdown("### Análisis del Número Plus")
+
+            csv_loto = obtener_config_juego('loto')['csv_path']
+            df_plus = pd.read_csv(csv_loto)
+            if 'numero_plus' in df_plus.columns:
+                serie_plus = pd.to_numeric(df_plus['numero_plus'], errors='coerce').dropna().astype(int)
+            else:
+                serie_plus = pd.Series(dtype='int64')
+
+            if serie_plus.empty:
+                st.info("No hay datos de Número Plus para analizar.")
+            else:
+                registros_recientes = serie_plus.tail(50)
+                prediccion_plus = predecir_numero_plus(csv_loto)
+                valores_plus = serie_plus.tolist()
+                filas_plus = []
+
+                for numero in range(10):
+                    posiciones = [i for i, valor in enumerate(valores_plus) if valor == numero]
+                    latencia = len(valores_plus) - 1 - posiciones[-1] if posiciones else len(valores_plus)
+                    filas_plus.append({
+                        'Número Plus': f"{numero:02d}",
+                        'Apariciones': len(posiciones),
+                        'Frecuencia histórica (%)': round(len(posiciones) / len(valores_plus) * 100, 2),
+                        'Últimos 50 registros': int((registros_recientes == numero).sum()),
+                        'Registros desde última aparición': latencia,
+                        'Score del modelo': round(prediccion_plus['scores'].get(numero, 0), 4),
+                    })
+
+                col_plus_tabla, col_plus_resumen = st.columns([3, 1])
+                with col_plus_tabla:
+                    st.dataframe(pd.DataFrame(filas_plus), width='stretch', hide_index=True)
+                with col_plus_resumen:
+                    st.metric("Mayor score", f"{prediccion_plus['numero_plus']:02d}")
+                    st.caption(
+                        "Alternativas: " + ", ".join(f"{numero:02d}" for numero in prediccion_plus['top3'][1:])
+                    )
     
     # ========================================================================
     # TAB 4: VISUALIZACIONES
@@ -3799,6 +3839,7 @@ def main():
                             modalidades_juego = ['Modalidad 1', 'Modalidad 2', 'Modalidad 3', 'Modalidad 4']
 
                         plus_entry = entry.get('numero_plus')
+                        plus_acertado = bool(evaluacion and evaluacion.get('acierto_plus'))
 
                         # Construir stats inline
                         stats_parts = []
@@ -3825,7 +3866,16 @@ def main():
 
                             numeros_texto = "<span style='display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap;'>" + "".join(numeros_html_parts) + "</span>"
                             if plus_entry is not None:
-                                numeros_texto += f" &nbsp;+&nbsp; <span style='color:#2EC4B6;font-weight:700;'>Plus: {plus_entry}</span>"
+                                if plus_acertado:
+                                    plus_html = (
+                                        f"<span style='display:inline-flex;align-items:center;gap:4px;color:#2EC4B6;font-weight:700;'>Plus: "
+                                        f"<span style='display:inline-flex;align-items:center;justify-content:center;"
+                                        f"width:24px;height:24px;border-radius:50%;background:#2EC4B6;color:#fff;"
+                                        f"font-size:0.80rem;font-weight:700;'>{int(plus_entry):02d}</span></span>"
+                                    )
+                                else:
+                                    plus_html = f"<span style='color:#2EC4B6;font-weight:700;'>Plus: {plus_entry}</span>"
+                                numeros_texto += f" &nbsp;+&nbsp; {plus_html}"
 
                             stats_columna = stats_texto if idx == 0 else ""
                             borde_fila = "border-bottom: 1px solid rgba(200,200,200,0.2);" if idx < len(modalidades_juego) - 1 else ""
