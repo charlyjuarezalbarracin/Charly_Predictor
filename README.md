@@ -14,6 +14,7 @@ Sistema profesional de análisis y predicción para el Quini 6 basado en estadí
 - ✅ **Generador de Combinaciones** con restricciones configurables
 - ✅ **Sistema de Backtesting** para validación y ajuste de parámetros
 - ✅ **Optimización con Algoritmos Genéticos**
+- El Quini muestra debajo de los pozos la fecha y los resultados del último día del CSV, con ceros iniciales y en orden de extracción, sin número de sorteo.
 
 ## 📁 Estructura del Proyecto
 

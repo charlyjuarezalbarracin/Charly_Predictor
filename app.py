@@ -2285,6 +2285,49 @@ def mostrar_portfolio(portfolio, freq_analyzer, portfolio_gen, metodo_nombre, nu
 # INTERFAZ PRINCIPAL
 # ============================================================================
 
+def formatear_numeros_loto(numeros):
+    if not isinstance(numeros, list) or len(numeros) != 6:
+        return None
+    try:
+        numeros_ordenados = sorted(int(numero) for numero in numeros)
+        return '-'.join(f"{numero:02d}" for numero in numeros_ordenados)
+    except (TypeError, ValueError):
+        return None
+
+
+def formatear_resumen_quini(csv_path):
+    """Formatea la ultima fecha del CSV real con los numeros en orden ascendente."""
+    df = pd.read_csv(csv_path)
+    if df.empty:
+        raise ValueError("El historico del Quini no contiene sorteos.")
+    fecha = pd.to_datetime(df['fecha']).max()
+    ultimos = df[pd.to_datetime(df['fecha']) == fecha].sort_values('sorteo_id')
+    if len(ultimos) != 4:
+        raise ValueError("La ultima fecha del Quini no contiene las cuatro modalidades.")
+    modalidades = [
+        ('Tradicional', 'Tradicional'),
+        ('Segunda', 'La segunda'),
+        ('Revancha', 'Revancha'),
+        ('SiempreSale', 'Siempre sale'),
+    ]
+    columnas = [f'num{i}' for i in range(1, 7)]
+    resultados = {
+        clave: [int(numero) for numero in fila]
+        for (clave, _), fila in zip(modalidades, ultimos[columnas].itertuples(index=False, name=None))
+    }
+    if any(
+        len(set(numeros)) != 6 or not all(0 <= numero <= 45 for numero in numeros)
+        for numeros in resultados.values()
+    ):
+        raise ValueError("El ultimo sorteo del Quini contiene numeros invalidos.")
+    detalle = f"Fecha {fecha:%d/%m/%Y}"
+    linea = ' | '.join(
+        f"{nombre} " + '-'.join(f"{numero:02d}" for numero in sorted(resultados[clave]))
+        for clave, nombre in modalidades
+    )
+    return detalle, linea
+
+
 def main():
     init_session_state()
     aplicar_fallback_copiado_nativo()
@@ -2314,6 +2357,15 @@ def main():
             seg_info  = seg_info  or '-'
             rev_info  = rev_info  or '-'
             ss_info   = ss_info   or '-'
+            bloque_resultados = ''
+            try:
+                detalle, resultados_txt = formatear_resumen_quini(config_juego_actual['csv_path'])
+                bloque_resultados = (
+                    f'<div style="margin-top:0.2rem;color:#999;font-size:0.78rem;">{detalle}</div>'
+                    f'<div style="margin-top:0.2rem;color:#ddd;font-size:0.76rem;line-height:1.35;">{resultados_txt}</div>'
+                )
+            except (OSError, ValueError, KeyError) as error:
+                st.warning(f"No se pudieron cargar los resultados del Quini: {error}")
             st.markdown(f"""
             <div class="pozos-container">
                 <div class="pozos-title">Pozos Actuales</div>
@@ -2339,6 +2391,7 @@ def main():
                         <div class="pozo-info">{ss_info}</div>
                     </div>
                 </div>
+                {bloque_resultados}
             </div>
             """, unsafe_allow_html=True)
 
@@ -2357,19 +2410,11 @@ def main():
             resultados = pozos.get('Resultados', {})
             meta = pozos.get('Meta', {})
 
-            def _fmt_nums(nums):
-                if not isinstance(nums, list) or len(nums) != 6:
-                    return None
-                try:
-                    return '-'.join([f"{int(n):02d}" for n in nums])
-                except Exception:
-                    return None
-
             lineas_resultados = []
-            trad_nums = _fmt_nums(resultados.get('Tradicional'))
-            match_nums = _fmt_nums(resultados.get('Match'))
-            desq_nums = _fmt_nums(resultados.get('Desquite'))
-            sale_nums = _fmt_nums(resultados.get('SaleOSale'))
+            trad_nums = formatear_numeros_loto(resultados.get('Tradicional'))
+            match_nums = formatear_numeros_loto(resultados.get('Match'))
+            desq_nums = formatear_numeros_loto(resultados.get('Desquite'))
+            sale_nums = formatear_numeros_loto(resultados.get('SaleOSale'))
             plus_num = resultados.get('Plus')
 
             if trad_nums:
@@ -4588,5 +4633,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
