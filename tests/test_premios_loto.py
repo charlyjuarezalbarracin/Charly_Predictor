@@ -171,20 +171,21 @@ class TestHistorialPremiosLoto(unittest.TestCase):
                 self.assertEqual(evaluacion["acierto_plus"], 1)
 
     def test_cinco_y_seis_aciertos(self):
-        for prediccion, aciertos, importe, vacante in [
-            ([7, 25, 32, 33, 37, 1], 5, "5245317.00", False),
-            ([7, 25, 32, 33, 37, 43], 6, None, True),
+        for prediccion, aciertos, importe, vacante, premiado in [
+            ([7, 25, 32, 33, 37, 1], 5, "5245317.00", False, True),
+            ([7, 25, 32, 33, 37, 43], 6, None, True, False),
         ]:
             resultado = self.evaluar(prediccion)["resultados_modalidad"][0]
             self.assertEqual(resultado["aciertos"], aciertos)
-            self.assertTrue(resultado["tiene_premio"])
+            self.assertEqual(resultado["tiene_premio"], premiado)
             self.assertEqual(resultado["premio_unitario"], importe)
             self.assertEqual(resultado["vacante"], vacante)
+            self.assertEqual(bool(app.formatear_premio_historial(resultado)), premiado)
 
     def test_tres_aciertos_sin_premio(self):
         resultado = self.evaluar([7, 25, 32, 1, 3, 8])["resultados_modalidad"][0]
         self.assertFalse(resultado["tiene_premio"])
-        self.assertEqual(app.formatear_premio_historial_loto(resultado), "")
+        self.assertEqual(app.formatear_premio_historial(resultado), "")
 
     def test_solo_muestra_aciertos_en_categorias_premiadas(self):
         for modalidad, premiados, niveles in [
@@ -206,7 +207,7 @@ class TestHistorialPremiosLoto(unittest.TestCase):
                     resultado = self.evaluar(prediccion, df)["resultados_modalidad"][0]
                     self.assertEqual(resultado["aciertos"], aciertos)
                     self.assertEqual(resultado["tiene_premio"], aciertos in premiados)
-                    texto = app.formatear_premio_historial_loto(resultado)
+                    texto = app.formatear_premio_historial(resultado)
                     self.assertEqual(bool(texto), aciertos in premiados)
                     if aciertos in premiados:
                         self.assertIn(f"{aciertos} aciertos", texto)
@@ -226,19 +227,19 @@ class TestHistorialPremiosLoto(unittest.TestCase):
                     }])
                     prediccion = list(range(aciertos)) + list(range(10, 16 - aciertos))
                     resultado = self.evaluar(prediccion, df)["resultados_modalidad"][0]
-                    self.assertEqual(bool(app.formatear_premio_historial_loto(resultado)), aciertos == categoria)
+                    self.assertEqual(bool(app.formatear_premio_historial(resultado)), aciertos == categoria)
 
     def test_no_reutiliza_premios_de_otra_fecha(self):
         df = self.cargar_reales("2026-10-28")
         resultado = self.evaluar([7, 25, 32, 33, 1, 3], df)["resultados_modalidad"][0]
         self.assertTrue(resultado["tiene_premio"])
         self.assertIsNone(resultado["premio_unitario"])
-        self.assertIn("no disponible", app.formatear_premio_historial_loto(resultado))
+        self.assertIn("no disponible", app.formatear_premio_historial(resultado))
 
     def test_importe_formateado_y_sin_multiplicar_plus(self):
         resultado = self.evaluar([7, 25, 32, 33, 1, 3])["resultados_modalidad"][0]
         self.assertEqual(
-            app.formatear_premio_historial_loto(resultado),
+            app.formatear_premio_historial(resultado),
             "4 aciertos | Premio: $ 13.803,47",
         )
 
@@ -254,7 +255,7 @@ class TestHistorialPremiosLoto(unittest.TestCase):
         self.assertEqual(historico["2026-10-24"]["Premios"]["Tradicional"]["4"]["premio_unitario"], "13803.47")
         self.assertEqual(historico["2026-10-28"]["Premios"]["Tradicional"]["4"]["premio_unitario"], "15000.00")
 
-    def test_quini_sin_cambios(self):
+    def test_quini_conserva_coincidencias_y_reconoce_categoria_premiada(self):
         df = pd.DataFrame([{
             "fecha": date(2026, 10, 24), "modalidad": "Tradicional",
             "numeros_real": (7, 25, 32, 33, 37, 43), "numero_plus_real": pd.NA,
@@ -262,6 +263,7 @@ class TestHistorialPremiosLoto(unittest.TestCase):
         resultado = self.evaluar([7, 25, 32, 33, 1, 3], df)["resultados_modalidad"][0]
         self.assertEqual(resultado, {
             "modalidad": "Tradicional", "aciertos": 4, "coincidencias": [7, 25, 32, 33],
+            "tiene_premio": True, "premio_unitario": None, "vacante": False,
         })
 
     def test_completar_historial_consulta_cada_fecha_una_vez(self):
@@ -275,8 +277,8 @@ class TestHistorialPremiosLoto(unittest.TestCase):
         with patch.object(app.st, "session_state", {"historial": [entry, entry]}), \
                 patch.object(app, "cargar_resultados_reales_historial", return_value=df), \
                 patch.object(app, "obtener_premios_loto_por_fecha", return_value=nuevos) as obtener:
-            app.actualizar_premios_historial_loto(self.pozos)
-            app.actualizar_premios_historial_loto(self.pozos)
+            app.actualizar_premios_historial(self.pozos, 'loto')
+            app.actualizar_premios_historial(self.pozos, 'loto')
             obtener.assert_called_once_with("2026-10-28")
         with self.ruta.open(encoding="utf-8") as f:
             guardados = json.load(f)
@@ -293,7 +295,7 @@ class TestHistorialPremiosLoto(unittest.TestCase):
                 patch.object(app, "cargar_resultados_reales_historial", return_value=df), \
                 patch.object(app, "obtener_premios_loto_por_fecha", side_effect=requests.HTTPError("404")):
             with self.assertRaisesRegex(ValueError, "2026-10-28"):
-                app.actualizar_premios_historial_loto(self.pozos)
+                app.actualizar_premios_historial(self.pozos, 'loto')
         with self.ruta.open(encoding="utf-8") as f:
             self.assertIn("2026-10-24", json.load(f)["Historial_premios"])
 
