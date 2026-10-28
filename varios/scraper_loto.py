@@ -7,6 +7,8 @@ El CSV generado queda separado del de Quini6 y agrega la columna `numero_plus`.
 """
 
 from datetime import datetime, timedelta
+from decimal import Decimal, ROUND_HALF_UP
+import json
 from pathlib import Path
 import re
 from typing import Dict, List
@@ -320,7 +322,7 @@ def _construir_registros_desde_xml(pozos_xml: dict) -> List[Dict]:
         if len(nums) != 6:
             continue
         try:
-            nums = [int(n) for n in nums]
+            nums = sorted(int(n) for n in nums)
         except Exception:
             continue
 
@@ -341,8 +343,13 @@ def _construir_registros_desde_xml(pozos_xml: dict) -> List[Dict]:
     return filas
 
 
-def _actualizar_loto_desde_xml_si_falta_ultimo(destino: Path) -> int:
-    """Actualiza CSV desde XML si falta solo el ultimo sorteo inmediato anterior."""
+def _actualizar_loto_desde_xml_si_falta_ultimo(destino: Path, solo_si_falta_ultimo: bool = True) -> int:
+    """Actualiza CSV desde XML oficial del ultimo sorteo.
+
+    Con solo_si_falta_ultimo=True aplica solo si el CSV llega al penultimo sorteo.
+    Con False agrega el ultimo sorteo del XML siempre que sea posterior al CSV
+    (complemento cuando la web anual va atrasada).
+    """
     ultima_fecha_csv = _obtener_ultima_fecha_csv_loto(destino)
     if not ultima_fecha_csv:
         return 0
@@ -350,8 +357,7 @@ def _actualizar_loto_desde_xml_si_falta_ultimo(destino: Path) -> int:
     ultimo = _ultimo_sorteo_loto_antes_de(datetime.now().date())
     penultimo = _ultimo_sorteo_loto_antes_de(ultimo)
 
-    # Caso objetivo: el CSV llega hasta el penultimo, por lo que falta solo el ultimo.
-    if ultima_fecha_csv != penultimo:
+    if solo_si_falta_ultimo and ultima_fecha_csv != penultimo:
         return 0
 
     try:
@@ -361,7 +367,9 @@ def _actualizar_loto_desde_xml_si_falta_ultimo(destino: Path) -> int:
             return 0
 
         fecha_xml = _fecha_a_date(((pozos_xml.get("Meta") or {}).get("fecha")))
-        if fecha_xml != ultimo:
+        if not fecha_xml or fecha_xml <= ultima_fecha_csv:
+            return 0
+        if solo_si_falta_ultimo and fecha_xml != ultimo:
             return 0
 
         registros_xml = _construir_registros_desde_xml(pozos_xml)
@@ -463,6 +471,9 @@ def actualizar_historico_loto_csv(
         df_final = _normalizar_dataframe(df_final)
 
     df_final.to_csv(destino, index=False, encoding="utf-8")
+
+    # Complemento: si la web anual todavia no publico el ultimo sorteo, tomarlo del XML oficial.
+    nuevas += _actualizar_loto_desde_xml_si_falta_ultimo(destino, solo_si_falta_ultimo=False)
     return int(nuevas)
 
 
@@ -663,7 +674,8 @@ def _parsear_pozos_desde_xml(xml_text: str, xml_url: str) -> dict:
         modalidad_raw = (extracto.findtext("Modalidad") or "").strip()
         modalidad_low = modalidad_raw.lower()
 
-        if modalidad_low == "numero plus":
+        # El XML oficial usa "Número PLUS" (con tilde y encoding variable).
+        if "plus" in modalidad_low:
             nodo_plus = extracto.find("./Suerte/N01")
             numero_plus = None
             if nodo_plus is not None and nodo_plus.text and nodo_plus.text.strip():
@@ -800,6 +812,115 @@ def _parsear_tabla_pozo(table, aciertos_target: str):
     return None
 
 
+def _parsear_pozos_desde_datos(texto: str) -> dict:
+    """Lee PREMIOS_DATA del sitio oficial, incluidos los importes por ganador."""
+    marcador = "window.PREMIOS_DATA"
+    if marcador not in texto:
+        raise ValueError("La fuente oficial no contiene PREMIOS_DATA")
+    contenido = texto.split(marcador, 1)[1].lstrip()
+    if not contenido.startswith("="):
+        raise ValueError("Asignacion de PREMIOS_DATA invalida")
+    datos, _ = json.JSONDecoder().raw_decode(contenido[1:].lstrip())
+    if not isinstance(datos, list) or not datos:
+        raise ValueError("La fuente oficial no contiene premios de sorteos")
+    sorteo = datos[-1]
+    fecha = datetime.strptime(sorteo["fecha"], "%d/%m/%Y").strftime("%Y-%m-%d")
+    pozos = {
+        "Plus": {"vacante": None},
+        "Meta": {
+            "sorteo": str(sorteo["sorteo"]),
+            "fecha": fecha,
+            "pozo_estimado": _normalizar_premio(str(sorteo.get("pozoEstimado", ""))),
+            "xml_url": urljoin(_URL_POZOS_LOTO, sorteo.get("archivos", {}).get("xml", "")),
+        },
+        "Resultados": {},
+        "Premios": {},
+    }
+    for juego in sorteo["juegos"]:
+        nombre = juego["juego"]
+        if "plus" in nombre.lower():
+            numeros = sorteo["numeros_juegos"].get(nombre, [])
+            numero_plus = int(numeros[0]) if numeros else None
+            pozos["Resultados"]["Plus"] = numero_plus
+            pozos["Plus"] = {
+                "numero": numero_plus,
+                "vacante": all(
+                    _normalizar_ganadores(str(n["ganadores"])) == "Vacante"
+                    for n in juego["niveles"]
+                ),
+            }
+            continue
+        modalidad = _mapear_modalidad(nombre)
+        if not modalidad:
+            continue
+        niveles = {}
+        for nivel in juego["niveles"]:
+            aciertos = str(int(nivel["aciertos"]))
+            ganadores = _normalizar_ganadores(str(nivel["ganadores"]))
+            importe = Decimal(str(nivel["premio_unid"]))
+            if not importe.is_finite() or importe < 0:
+                raise ValueError(f"Premio unitario invalido para {nombre}, {aciertos} aciertos")
+            niveles[aciertos] = {
+                "pozo": _normalizar_premio(str(nivel["pozo"])),
+                "ganadores": ganadores,
+                "premio_unitario": (
+                    str(importe.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+                    if ganadores != "Vacante" else None
+                ),
+            }
+        if not niveles:
+            raise ValueError(f"No hay niveles de premio para {nombre}")
+        if modalidad in ("Tradicional", "Match") and not {"4", "5", "6"}.issubset(niveles):
+            raise ValueError(f"Faltan niveles de 4, 5 o 6 aciertos para {nombre}")
+        mayor = niveles[max(niveles, key=int)]
+        pozos[modalidad] = {"premio": mayor["pozo"], "ganadores": mayor["ganadores"]}
+        pozos["Premios"][modalidad] = niveles
+        pozos["Resultados"][modalidad] = [
+            int(n) for n in sorteo["numeros_juegos"][nombre]
+        ]
+    if not all(m in pozos["Premios"] for m in ("Tradicional", "Match", "Desquite", "SaleOSale")):
+        raise ValueError("Premios oficiales incompletos: faltan modalidades de Loto")
+    return pozos
+
+
+def _obtener_pozos_loto_web(fecha: str = None) -> dict:
+    """Consulta el objeto oficial del ultimo sorteo o de una fecha especifica."""
+    if fecha is None:
+        soup = _descargar_soup(_URL_POZOS_LOTO)
+        seleccionado = soup.find(id="sorteoCombo")
+        numero = seleccionado.get("value") if seleccionado else None
+    else:
+        # La portada solo lista el mes actual; el XML conserva el numero del sorteo historico.
+        fecha_sorteo = datetime.strptime(fecha, "%Y-%m-%d")
+        archivo = fecha_sorteo.strftime("%Y/%m/LTO51X%Y%m%d.xml")
+        xml_resp = requests.get(
+            urljoin(_URL_POZOS_LOTO, "export/descarga.php"),
+            params={"sorteo": archivo}, headers=HEADERS, timeout=30,
+        )
+        xml_resp.raise_for_status()
+        try:
+            root = ET.fromstring(xml_resp.text)
+        except ET.ParseError as e:
+            raise ValueError(f"XML oficial invalido para {fecha}") from e
+        if _parsear_fecha_xml(root.findtext("FechaSorteo") or "") != fecha:
+            raise ValueError(f"El XML devolvio otro sorteo para {fecha}")
+        numero = (root.findtext("Sorteo") or "").strip()
+    if not numero or not str(numero).isdigit():
+        raise ValueError(f"No se encontro el sorteo oficial de Loto para {fecha or 'la ultima fecha'}")
+    url = urljoin(_URL_POZOS_LOTO, "includes/resultados-data.php")
+    resp = requests.get(url, params={"sorteo": numero}, headers=HEADERS, timeout=30)
+    resp.raise_for_status()
+    pozos = _parsear_pozos_desde_datos(resp.text)
+    if fecha is not None and pozos["Meta"]["fecha"] != fecha:
+        raise ValueError(f"La fuente devolvio premios de otra fecha para {fecha}")
+    return pozos
+
+
+def obtener_premios_loto_por_fecha(fecha: str) -> dict:
+    """Obtiene premios unitarios oficiales sin reutilizar los de otro sorteo."""
+    return _obtener_pozos_loto_web(fecha)
+
+
 def obtener_pozos_loto() -> dict:
     """Obtiene los pozos del último sorteo de Loto desde loto.loteriadelaciudad.gob.ar.
 
@@ -808,7 +929,8 @@ def obtener_pozos_loto() -> dict:
 
     Returns:
         dict con claves 'Tradicional', 'Match', 'Desquite', 'SaleOSale', 'Plus'
-        (cada una con 'premio' y 'ganadores'/'vacante'), o None si falla.
+        (cada una con 'premio' y 'ganadores'/'vacante'), 'Meta', 'Resultados'
+        y 'Premios' por cantidad de aciertos, o None si falla.
     """
     parsed = urlparse(_URL_POZOS_LOTO)
     if "loto.loteriadelaciudad.gob.ar" not in parsed.netloc:
@@ -817,7 +939,12 @@ def obtener_pozos_loto() -> dict:
             "Solo se permite acceder a loto.loteriadelaciudad.gob.ar"
         )
 
-    # Intento 1: XML oficial descargado desde el bloque de resultados.
+    try:
+        return _obtener_pozos_loto_web()
+    except (requests.RequestException, ValueError, KeyError, TypeError) as e:
+        print(f"No se pudieron obtener premios unitarios oficiales de Loto: {e}")
+
+    # El XML conserva los pozos y resultados si no se puede leer el objeto web.
     try:
         xml_text, xml_url = _descargar_xml_ultimo_sorteo()
         pozos_xml = _parsear_pozos_desde_xml(xml_text, xml_url)

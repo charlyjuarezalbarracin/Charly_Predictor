@@ -15,6 +15,8 @@ Sistema profesional de análisis y predicción para el Quini 6 basado en estadí
 - ✅ **Sistema de Backtesting** para validación y ajuste de parámetros
 - ✅ **Optimización con Algoritmos Genéticos**
 - El Quini muestra debajo de los pozos la fecha y los resultados del último día del CSV, con ceros iniciales y en orden de extracción, sin número de sorteo.
+- En Loto, Historial reconoce premios desde 4 aciertos en Tradicional y Match. Al actualizar datos, se guardan por fecha los importes oficiales de «Premio uni.» (por persona, sin multiplicador Plus), separados del pozo total. Si falta el importe del sorteo correspondiente, se muestra como no disponible; nunca se usa el de otra fecha.
+- El texto de aciertos y premio solo aparece para categorias premiadas: 4, 5 o 6 en Tradicional y Match, 6 en Desquite y la categoria oficial del sorteo en Sale o Sale. Las filas y los numeros permanecen visibles aunque no tengan premio.
 
 ## 📁 Estructura del Proyecto
 

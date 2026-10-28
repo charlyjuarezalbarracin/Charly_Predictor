@@ -8,9 +8,11 @@
 import streamlit as st
 import streamlit.components.v1 as components
 import pandas as pd
+import requests
 import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime
+from decimal import Decimal
 import json
 from pathlib import Path
 
@@ -23,7 +25,9 @@ from core.generator.optimizer import CombinationOptimizer
 from core.backtesting import WalkForwardBacktester
 from utils.data_generator import generate_sample_data
 from varios.scraper_quiniya_final import actualizar_historico_csv, obtener_pozos_ultimo_sorteo
-from varios.scraper_loto import actualizar_historico_loto_csv, obtener_pozos_loto
+from varios.scraper_loto import (
+    actualizar_historico_loto_csv, obtener_pozos_loto, obtener_premios_loto_por_fecha,
+)
 
 # Importar configuración optimizada
 try:
@@ -1159,13 +1163,22 @@ def cargar_pozos_json():
 
 
 def guardar_pozos_loto_json(pozos):
-    """Guardar pozos de Loto en archivo JSON (separado de Quini6)"""
-    try:
-        POZOS_LOTO_FILE.parent.mkdir(parents=True, exist_ok=True)
-        with open(POZOS_LOTO_FILE, 'w', encoding='utf-8') as f:
-            json.dump(pozos, f, indent=2, ensure_ascii=False)
-    except Exception as e:
-        print(f"No se pudo guardar pozos Loto: {str(e)}")
+    """Guarda pozos actuales y conserva premios unitarios por fecha de sorteo."""
+    historico = {}
+    if POZOS_LOTO_FILE.exists():
+        with open(POZOS_LOTO_FILE, 'r', encoding='utf-8') as f:
+            historico.update(json.load(f).get('Historial_premios', {}))
+    historico.update(pozos.get('Historial_premios', {}))
+    fecha = pozos.get('Meta', {}).get('fecha')
+    if fecha and pozos.get('Premios'):
+        historico[fecha] = {
+            'Meta': pozos['Meta'],
+            'Premios': pozos['Premios'],
+        }
+    pozos['Historial_premios'] = historico
+    POZOS_LOTO_FILE.parent.mkdir(parents=True, exist_ok=True)
+    with open(POZOS_LOTO_FILE, 'w', encoding='utf-8') as f:
+        json.dump(pozos, f, indent=2, ensure_ascii=False)
 
 
 def _sanear_importes_pozos_loto(pozos):
@@ -1426,7 +1439,25 @@ def cargar_resultados_reales_historial(juego='quini6'):
         else:
             df['numero_plus_real'] = pd.NA
 
-    return df[['fecha', 'modalidad', 'numeros_real', 'numero_plus_real']].copy()
+    columnas = ['fecha', 'modalidad', 'numeros_real', 'numero_plus_real']
+    if juego == 'loto':
+        pozos = cargar_pozos_loto_json() or {}
+        historico = dict(pozos.get('Historial_premios', {}))
+        fecha_pozos = pozos.get('Meta', {}).get('fecha')
+        if fecha_pozos and pozos.get('Premios'):
+            historico[fecha_pozos] = pozos
+        mapa_modalidades = {
+            'Loto Tradicional': 'Tradicional', 'Loto Match': 'Match',
+            'Loto Desquite': 'Desquite', 'Loto Sale o Sale': 'SaleOSale',
+        }
+        df['premios_modalidad'] = df.apply(
+            lambda row: historico.get(str(row['fecha']), {}).get('Premios', {}).get(
+                mapa_modalidades.get(row['modalidad']), {}
+            ),
+            axis=1,
+        )
+        columnas.append('premios_modalidad')
+    return df[columnas].copy()
 
 
 def inferir_juego_historial(juego_nombre):
@@ -1570,11 +1601,26 @@ def evaluar_entry_historial_con_real(entry, df_real):
         numeros_real = row['numeros_real']
         coincidencias = sorted(pred_set & set(numeros_real))
         aciertos = len(coincidencias)
-        resultados_modalidad.append({
+        resultado_modalidad = {
             'modalidad': str(row['modalidad']),
             'aciertos': int(aciertos),
             'coincidencias': [int(n) for n in coincidencias]
-        })
+        }
+        if str(row['modalidad']).startswith('Loto '):
+            niveles = row.get('premios_modalidad', {})
+            nivel = niveles.get(str(aciertos), {})
+            if row['modalidad'] in ('Loto Tradicional', 'Loto Match'):
+                tiene_premio = aciertos in (4, 5, 6)
+            elif row['modalidad'] == 'Loto Desquite':
+                tiene_premio = aciertos == 6
+            else:
+                tiene_premio = bool(nivel) and nivel.get('ganadores') != 'Vacante'
+            resultado_modalidad.update({
+                'tiene_premio': tiene_premio,
+                'premio_unitario': nivel.get('premio_unitario'),
+                'vacante': nivel.get('ganadores') == 'Vacante',
+            })
+        resultados_modalidad.append(resultado_modalidad)
 
     if not resultados_modalidad:
         return None
@@ -1595,6 +1641,44 @@ def evaluar_entry_historial_con_real(entry, df_real):
         resultado['plus_disponible'] = False
 
     return resultado
+
+
+def formatear_premio_historial_loto(resultado):
+    """Muestra aciertos y premio base por persona solo en categorias premiadas."""
+    if not resultado.get('tiene_premio'):
+        return ""
+    aciertos = resultado['aciertos']
+    texto = f"{aciertos} acierto{'s' if aciertos != 1 else ''}"
+    if resultado.get('vacante'):
+        return texto + " | Premio: vacante"
+    importe = resultado.get('premio_unitario')
+    if importe is None:
+        return texto + " | Premio: no disponible"
+    importe_formateado = f"{Decimal(importe):,.2f}".replace(',', '_').replace('.', ',').replace('_', '.')
+    return texto + f" | Premio: $ {importe_formateado}"
+
+
+def actualizar_premios_historial_loto(pozos):
+    """Completa los premios de las fechas evaluadas, sin alterar los pozos actuales."""
+    df_real = cargar_resultados_reales_historial('loto')
+    fechas = set()
+    for entry in st.session_state.get('historial', []):
+        if inferir_juego_historial(entry.get('juego', 'Quini 6')) != 'loto':
+            continue
+        evaluacion = evaluar_entry_historial_con_real(entry, df_real)
+        if evaluacion and evaluacion['estado'] == 'ok':
+            fechas.add(evaluacion['fecha_real'])
+    historico = pozos.setdefault('Historial_premios', {})
+    errores = []
+    for fecha in sorted(fechas - historico.keys()):
+        try:
+            datos = obtener_premios_loto_por_fecha(fecha)
+            historico[fecha] = {'Meta': datos['Meta'], 'Premios': datos['Premios']}
+        except (requests.RequestException, ValueError, KeyError, TypeError) as e:
+            errores.append(f"{fecha}: {e}")
+    guardar_pozos_loto_json(pozos)
+    if errores:
+        raise ValueError("No se pudieron actualizar algunos premios de Loto: " + "; ".join(errores))
 
 
 def mostrar_bolillas(numeros_sorteo, numeros_acertados):
@@ -2582,6 +2666,7 @@ def main():
                                 if pozos:
                                     st.session_state.pozos_loto = pozos
                                     guardar_pozos_loto_json(pozos)
+                                    actualizar_premios_historial_loto(pozos)
 
                         # Construir mensaje combinado
                         mensajes = []
@@ -3873,7 +3958,12 @@ def main():
                         )
 
                         coincidencias_map = {}
+                        resultados_modalidad_map = {}
                         if evaluacion and evaluacion.get('estado') == 'ok':
+                            resultados_modalidad_map = {
+                                r['modalidad']: r
+                                for r in evaluacion.get('resultados_modalidad', [])
+                            }
                             coincidencias_map = {
                                 r.get('modalidad', ''): set(r.get('coincidencias', []))
                                 for r in evaluacion.get('resultados_modalidad', [])
@@ -3893,6 +3983,8 @@ def main():
                             stats_parts.append(f"Score: {entry['scores']['score_promedio']:.3f}")
                             stats_parts.append(f"Pares: {entry['scores']['pares']}/6")
                         stats_texto = " &nbsp;|&nbsp; ".join(stats_parts)
+                        if juego_key == 'loto' and evaluacion and evaluacion.get('estado') == 'ok':
+                            stats_texto = f"Sorteo: {evaluacion['fecha_real']} &nbsp;|&nbsp; {stats_texto}"
 
                         filas_modalidad_html = []
                         for idx, modalidad in enumerate(modalidades_juego):
@@ -3923,12 +4015,22 @@ def main():
                                 numeros_texto += f" &nbsp;+&nbsp; {plus_html}"
 
                             stats_columna = stats_texto if idx == 0 else ""
+                            premio_html = ""
+                            resultado_modalidad = resultados_modalidad_map.get(modalidad)
+                            if juego_key == 'loto' and resultado_modalidad:
+                                premio_texto = formatear_premio_historial_loto(resultado_modalidad)
+                                if premio_texto:
+                                    premio_html = (
+                                        f"<div style='font-size:0.82rem;color:#2EC4B6;"
+                                        f"font-weight:700;text-transform:uppercase;'>{premio_texto}</div>"
+                                    )
                             borde_fila = "border-bottom: 1px solid rgba(200,200,200,0.2);" if idx < len(modalidades_juego) - 1 else ""
 
                             filas_modalidad_html.append(
                                 f"<div style='display:flex;align-items:center;gap:20px;padding:5px 0;{borde_fila}'>"
                                 f"<div style='min-width: 220px; font-weight: 600; color: #2EC4B6; font-size: 0.85rem;'>{juego_entry} - {entry['metodo']} - {modalidad}</div>"
                                 f"<div style='font-size: 0.95rem; min-width: 220px;'>{numeros_texto}</div>"
+                                f"{premio_html}"
                                 f"<div style='color: #888; font-size: 0.82rem;'>{stats_columna}</div>"
                                 f"</div>"
                             )
