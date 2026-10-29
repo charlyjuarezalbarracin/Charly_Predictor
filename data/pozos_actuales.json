@@ -1,41 +1,41 @@
 {
   "Meta": {
-    "fecha": "2026-10-25",
-    "sorteo": "3420",
+    "fecha": "2026-10-28",
+    "sorteo": "3421",
     "fuente": "https://www.loteriasantafe.gov.ar/quini-6-2/"
   },
   "Resultados": {
     "Tradicional": [
-      0,
-      2,
-      3,
-      8,
-      19,
-      39
+      6,
+      25,
+      34,
+      36,
+      38,
+      45
     ],
     "Segunda": [
-      8,
-      25,
-      30,
-      36,
+      9,
+      19,
+      26,
+      29,
+      33,
+      44
+    ],
+    "Revancha": [
+      22,
+      26,
+      35,
+      42,
       43,
       45
     ],
-    "Revancha": [
-      5,
-      22,
-      23,
-      29,
-      41,
-      43
-    ],
     "SiempreSale": [
-      0,
-      13,
+      20,
       22,
-      24,
-      40,
-      43
+      26,
+      35,
+      36,
+      37
     ]
   },
   "Premios": {
@@ -46,52 +46,52 @@
         "premio_unitario": null
       },
       "5": {
-        "pozo": "54515520",
-        "ganadores": "21",
-        "premio_unitario": "2595977.14"
+        "pozo": "41095944",
+        "ganadores": "4",
+        "premio_unitario": "10273986.00"
       },
       "4": {
-        "pozo": "16354656",
-        "ganadores": "1336",
-        "premio_unitario": "12241.51"
+        "pozo": "12328783",
+        "ganadores": "474",
+        "premio_unitario": "26010.09"
       }
     },
     "Segunda": {
       "6": {
-        "pozo": "1255420958",
+        "pozo": "1504931702",
         "ganadores": "Vacante",
         "premio_unitario": null
       },
       "5": {
-        "pozo": "54515520",
-        "ganadores": "6",
-        "premio_unitario": "9085920.00"
+        "pozo": "41095944",
+        "ganadores": "13",
+        "premio_unitario": "3161226.46"
       },
       "4": {
-        "pozo": "16354656",
-        "ganadores": "838",
-        "premio_unitario": "19516.30"
+        "pozo": "12328783",
+        "ganadores": "1247",
+        "premio_unitario": "9886.75"
       }
     },
     "Revancha": {
       "6": {
-        "pozo": "800000000",
-        "ganadores": "Vacante",
-        "premio_unitario": null
+        "pozo": "1080516153",
+        "ganadores": "1",
+        "premio_unitario": "1080516153.60"
       }
     },
     "SiempreSale": {
       "5": {
-        "pozo": "489092256",
-        "ganadores": "8",
-        "premio_unitario": "61136532.00"
+        "pozo": "368765460",
+        "ganadores": "2",
+        "premio_unitario": "184382730.00"
       }
     },
     "Extra": {
       "6": {
         "pozo": "200000000",
-        "ganadores": "724",
-        "premio_unitario": "276243.09"
+        "ganadores": "369",
+        "premio_unitario": "542005.42"
       }
     }
   },
@@ -100,16 +100,16 @@
     "ganadores": "Vacante"
   },
   "Segunda": {
-    "premio": "1255420958",
+    "premio": "1504931702",
     "ganadores": "Vacante"
   },
   "Revancha": {
-    "premio": "800000000",
-    "ganadores": "Vacante"
+    "premio": "1080516153",
+    "ganadores": "1"
   },
   "SiempreSale": {
-    "premio": "489092256",
-    "ganadores": "8"
+    "premio": "368765460",
+    "ganadores": "2"
   },
   "Historial_premios": {
     "2026-10-25": {
@@ -1132,6 +1132,70 @@
             "pozo": "200000000",
             "ganadores": "3445",
             "premio_unitario": "58055.15"
+          }
+        }
+      }
+    },
+    "2026-10-28": {
+      "Meta": {
+        "fecha": "2026-10-28",
+        "sorteo": "3421",
+        "fuente": "https://www.loteriasantafe.gov.ar/quini-6-2/"
+      },
+      "Premios": {
+        "Tradicional": {
+          "6": {
+            "pozo": "1100000000",
+            "ganadores": "Vacante",
+            "premio_unitario": null
+          },
+          "5": {
+            "pozo": "41095944",
+            "ganadores": "4",
+            "premio_unitario": "10273986.00"
+          },
+          "4": {
+            "pozo": "12328783",
+            "ganadores": "474",
+            "premio_unitario": "26010.09"
+          }
+        },
+        "Segunda": {
+          "6": {
+            "pozo": "1504931702",
+            "ganadores": "Vacante",
+            "premio_unitario": null
+          },
+          "5": {
+            "pozo": "41095944",
+            "ganadores": "13",
+            "premio_unitario": "3161226.46"
+          },
+          "4": {
+            "pozo": "12328783",
+            "ganadores": "1247",
+            "premio_unitario": "9886.75"
+          }
+        },
+        "Revancha": {
+          "6": {
+            "pozo": "1080516153",
+            "ganadores": "1",
+            "premio_unitario": "1080516153.60"
+          }
+        },
+        "SiempreSale": {
+          "5": {
+            "pozo": "368765460",
+            "ganadores": "2",
+            "premio_unitario": "184382730.00"
+          }
+        },
+        "Extra": {
+          "6": {
+            "pozo": "200000000",
+            "ganadores": "369",
+            "premio_unitario": "542005.42"
           }
         }
       }

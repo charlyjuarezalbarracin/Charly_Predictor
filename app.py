@@ -3059,7 +3059,7 @@ def main():
         
         # Mostrar análisis si están activos
         if usar_regresion_equilibrio and regression_analyzer:
-            st.markdown("### Análisis de Regresión al Equilibrio")
+
             mostrar_analisis_regresion_equilibrio(regression_analyzer)
         
         if usar_resonancia_ciclos and cycle_resonance_analyzer:
@@ -3071,8 +3071,6 @@ def main():
             mostrar_analisis_multi_timeframe(multi_timeframe_analyzer)
         
         # Botón de generar predicción
-        st.markdown("## Generar Predicción")
-        
         col_btn1, col_btn2 = st.columns([1, 3])
         
         with col_btn1:
@@ -3368,6 +3366,8 @@ def main():
                         nums_cond = ', '.join([f"{int(n):02d}" for n in result['conditional']['combination']])
                         nums_rapido = ', '.join([f"{int(n):02d}" for n in prediccion_rapida['numeros']])
                         texto_copiar = f"{nombre_juego_copiar}:\nEstándar{opt_suffix}: {nums_std}\nCondicional{opt_suffix}: {nums_cond}\nRápido: {nums_rapido}\n"
+                        if st.session_state.juego_actual == 'loto':
+                            texto_copiar += f"Numero plus: {_plus_loto}\n"
 
                         mejor_metodo = calcular_mejor_metodo_historial()
                         if mejor_metodo:
@@ -3380,6 +3380,8 @@ def main():
                         if usar_optimizer:
                             texto_copiar = f"(Opt) {texto_copiar}"
                         texto_copiar = f"{nombre_juego_copiar}:\n" + texto_copiar
+                        if st.session_state.juego_actual == 'loto':
+                            texto_copiar += f"\nNumero plus: {_plus_loto}"
                         if lineas_pozos:
                             texto_copiar += "\n\n" + "\n".join(lineas_pozos)
                     
@@ -3396,8 +3398,6 @@ def main():
                             f'</div>',
                             unsafe_allow_html=True
                         )
-                        # Actualizar texto_copiar para incluir plus
-                        texto_copiar = texto_copiar + f"\nNumero plus: {_plus_loto}"
 
                     mostrar_bloque_copiable(
                         texto_copiar,
@@ -4115,7 +4115,7 @@ def main():
                             )
                             if premio_extra_texto:
                                 premio_extra_html = (
-                                    f"<div style='font-size:0.82rem;color:#2EC4B6;"
+                                    f"<div style='font-size:0.82rem;color:#1B98C9;"
                                     f"font-weight:700;padding:5px 0;'>{premio_extra_texto}</div>"
                                 )
 

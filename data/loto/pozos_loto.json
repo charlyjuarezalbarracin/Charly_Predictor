@@ -1,114 +1,114 @@
 {
   "Plus": {
-    "numero": 6,
+    "numero": 3,
     "vacante": true
   },
   "Meta": {
-    "sorteo": "3929",
-    "fecha": "2026-10-24",
-    "pozo_estimado": "28972000000",
-    "xml_url": "https://loto.loteriadelaciudad.gob.ar/export/descarga.php?sorteo=2026/10/LTO51X20261024.xml"
+    "sorteo": "3930",
+    "fecha": "2026-10-28",
+    "pozo_estimado": "29300000000",
+    "xml_url": "https://loto.loteriadelaciudad.gob.ar/export/descarga.php?sorteo=2026/10/LTO51X20261028.xml"
   },
   "Resultados": {
     "Tradicional": [
-      7,
-      25,
-      32,
-      33,
-      37,
-      43
+      3,
+      4,
+      5,
+      11,
+      24,
+      37
     ],
     "Match": [
       0,
       2,
-      7,
-      17,
-      29,
-      42
+      20,
+      23,
+      32,
+      37
     ],
     "Desquite": [
-      2,
-      5,
-      12,
-      22,
-      44,
-      45
+      16,
+      18,
+      24,
+      25,
+      27,
+      31
     ],
     "SaleOSale": [
-      4,
+      9,
       13,
       16,
-      17,
       18,
-      24
+      20,
+      37
     ],
-    "Plus": 6
+    "Plus": 3
   },
   "Premios": {
     "Tradicional": {
       "6": {
-        "pozo": "4424318990",
+        "pozo": "4458912655",
         "ganadores": "Vacante",
         "premio_unitario": null
       },
       "5": {
-        "pozo": "20981268",
-        "ganadores": "4",
-        "premio_unitario": "5245317.00"
+        "pozo": "16122585",
+        "ganadores": "13",
+        "premio_unitario": "1240198.89"
       },
       "4": {
-        "pozo": "4196253",
-        "ganadores": "304",
-        "premio_unitario": "13803.47"
+        "pozo": "3224517",
+        "ganadores": "439",
+        "premio_unitario": "7345.14"
       }
     },
     "Match": {
       "6": {
-        "pozo": "2292219616",
+        "pozo": "2326813281",
         "ganadores": "Vacante",
         "premio_unitario": null
       },
       "5": {
-        "pozo": "20981268",
-        "ganadores": "3",
-        "premio_unitario": "6993756.00"
+        "pozo": "16122585",
+        "ganadores": "8",
+        "premio_unitario": "2015323.20"
       },
       "4": {
-        "pozo": "4196253",
-        "ganadores": "423",
-        "premio_unitario": "9920.22"
+        "pozo": "3224517",
+        "ganadores": "270",
+        "premio_unitario": "11942.66"
       }
     },
     "Desquite": {
       "6": {
-        "pozo": "2836877795",
+        "pozo": "2870876483",
         "ganadores": "Vacante",
         "premio_unitario": null
       }
     },
     "SaleOSale": {
       "5": {
-        "pozo": "54042660",
-        "ganadores": "14",
-        "premio_unitario": "3860190.00"
+        "pozo": "41527872",
+        "ganadores": "5",
+        "premio_unitario": "8305574.40"
       }
     }
   },
   "Tradicional": {
-    "premio": "4424318990",
+    "premio": "4458912655",
     "ganadores": "Vacante"
   },
   "Match": {
-    "premio": "2292219616",
+    "premio": "2326813281",
     "ganadores": "Vacante"
   },
   "Desquite": {
-    "premio": "2836877795",
+    "premio": "2870876483",
     "ganadores": "Vacante"
   },
   "SaleOSale": {
-    "premio": "54042660",
-    "ganadores": "14"
+    "premio": "41527872",
+    "ganadores": "5"
   },
   "Historial_premios": {
     "2026-10-24": {
@@ -1035,6 +1035,64 @@
             "pozo": "52236036",
             "ganadores": "11",
             "premio_unitario": "4748730.55"
+          }
+        }
+      }
+    },
+    "2026-10-28": {
+      "Meta": {
+        "sorteo": "3930",
+        "fecha": "2026-10-28",
+        "pozo_estimado": "29300000000",
+        "xml_url": "https://loto.loteriadelaciudad.gob.ar/export/descarga.php?sorteo=2026/10/LTO51X20261028.xml"
+      },
+      "Premios": {
+        "Tradicional": {
+          "6": {
+            "pozo": "4458912655",
+            "ganadores": "Vacante",
+            "premio_unitario": null
+          },
+          "5": {
+            "pozo": "16122585",
+            "ganadores": "13",
+            "premio_unitario": "1240198.89"
+          },
+          "4": {
+            "pozo": "3224517",
+            "ganadores": "439",
+            "premio_unitario": "7345.14"
+          }
+        },
+        "Match": {
+          "6": {
+            "pozo": "2326813281",
+            "ganadores": "Vacante",
+            "premio_unitario": null
+          },
+          "5": {
+            "pozo": "16122585",
+            "ganadores": "8",
+            "premio_unitario": "2015323.20"
+          },
+          "4": {
+            "pozo": "3224517",
+            "ganadores": "270",
+            "premio_unitario": "11942.66"
+          }
+        },
+        "Desquite": {
+          "6": {
+            "pozo": "2870876483",
+            "ganadores": "Vacante",
+            "premio_unitario": null
+          }
+        },
+        "SaleOSale": {
+          "5": {
+            "pozo": "41527872",
+            "ganadores": "5",
+            "premio_unitario": "8305574.40"
           }
         }
       }
