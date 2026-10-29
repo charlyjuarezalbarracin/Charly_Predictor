@@ -8,9 +8,11 @@
 import streamlit as st
 import streamlit.components.v1 as components
 import pandas as pd
+import requests
 import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime
+from decimal import Decimal
 import json
 from pathlib import Path
 
@@ -22,8 +24,13 @@ from core.generator import StrategyManager, GenerationStrategy, PortfolioGenerat
 from core.generator.optimizer import CombinationOptimizer
 from core.backtesting import WalkForwardBacktester
 from utils.data_generator import generate_sample_data
-from varios.scraper_quiniya_final import actualizar_historico_csv, obtener_pozos_ultimo_sorteo
-from varios.scraper_loto import actualizar_historico_loto_csv, obtener_pozos_loto
+from varios.scraper_quiniya_final import actualizar_historico_csv
+from varios.scraper_quini_oficial import (
+    obtener_pozos_quini_oficial, obtener_premios_quini_por_fecha,
+)
+from varios.scraper_loto import (
+    actualizar_historico_loto_csv, obtener_pozos_loto, obtener_premios_loto_por_fecha,
+)
 
 # Importar configuración optimizada
 try:
@@ -815,6 +822,11 @@ st.markdown("""
         font-weight: 500 !important;
     }
 
+    [data-testid="stExpander"] summary .stMarkdownColoredText > strong {
+        color: #2EC4B6 !important;
+        font-weight: 700 !important;
+    }
+
     /* Sidebar - mismo tamaño de texto general para checkbox, slider y expander (mayor especificidad que las reglas globales de arriba) */
     [data-testid="stSidebar"] .stCheckbox label,
     [data-testid="stSidebar"] .stSlider label,
@@ -1138,13 +1150,8 @@ def calcular_inversiones(premio, base, tna, meses=12, gastos_iniciales=None):
     return pd.DataFrame(resultados)
 
 def guardar_pozos_json(pozos):
-    """Guardar pozos de Quini6 en archivo JSON"""
-    try:
-        POZOS_FILE.parent.mkdir(parents=True, exist_ok=True)
-        with open(POZOS_FILE, 'w', encoding='utf-8') as f:
-            json.dump(pozos, f, indent=2, ensure_ascii=False)
-    except Exception as e:
-        print(f"No se pudo guardar pozos: {str(e)}")
+    """Guarda pozos de Quini6 y conserva sus premios por fecha."""
+    _guardar_pozos_con_historial(pozos, POZOS_FILE)
 
 def cargar_pozos_json():
     """Cargar pozos de Quini6 desde archivo JSON"""
@@ -1159,13 +1166,27 @@ def cargar_pozos_json():
 
 
 def guardar_pozos_loto_json(pozos):
-    """Guardar pozos de Loto en archivo JSON (separado de Quini6)"""
-    try:
-        POZOS_LOTO_FILE.parent.mkdir(parents=True, exist_ok=True)
-        with open(POZOS_LOTO_FILE, 'w', encoding='utf-8') as f:
-            json.dump(pozos, f, indent=2, ensure_ascii=False)
-    except Exception as e:
-        print(f"No se pudo guardar pozos Loto: {str(e)}")
+    """Guarda pozos actuales y conserva premios unitarios por fecha de sorteo."""
+    _guardar_pozos_con_historial(pozos, POZOS_LOTO_FILE)
+
+
+def _guardar_pozos_con_historial(pozos, archivo):
+    """Conserva los premios de cada sorteo en el archivo del juego correspondiente."""
+    historico = {}
+    if archivo.exists():
+        with open(archivo, 'r', encoding='utf-8') as f:
+            historico.update(json.load(f).get('Historial_premios', {}))
+    historico.update(pozos.get('Historial_premios', {}))
+    fecha = pozos.get('Meta', {}).get('fecha')
+    if fecha and pozos.get('Premios'):
+        historico[fecha] = {
+            'Meta': pozos['Meta'],
+            'Premios': pozos['Premios'],
+        }
+    pozos['Historial_premios'] = historico
+    archivo.parent.mkdir(parents=True, exist_ok=True)
+    with open(archivo, 'w', encoding='utf-8') as f:
+        json.dump(pozos, f, indent=2, ensure_ascii=False)
 
 
 def _sanear_importes_pozos_loto(pozos):
@@ -1426,7 +1447,32 @@ def cargar_resultados_reales_historial(juego='quini6'):
         else:
             df['numero_plus_real'] = pd.NA
 
-    return df[['fecha', 'modalidad', 'numeros_real', 'numero_plus_real']].copy()
+    columnas = ['fecha', 'modalidad', 'numeros_real', 'numero_plus_real']
+    if juego in ('loto', 'quini6'):
+        pozos = (cargar_pozos_loto_json() if juego == 'loto' else cargar_pozos_json()) or {}
+        historico = dict(pozos.get('Historial_premios', {}))
+        fecha_pozos = pozos.get('Meta', {}).get('fecha')
+        if fecha_pozos and pozos.get('Premios'):
+            historico[fecha_pozos] = pozos
+        mapa_modalidades = {
+            'Loto Tradicional': 'Tradicional', 'Loto Match': 'Match',
+            'Loto Desquite': 'Desquite', 'Loto Sale o Sale': 'SaleOSale',
+            'Tradicional': 'Tradicional', 'Segunda': 'Segunda',
+            'Revancha': 'Revancha', 'Siempre Sale': 'SiempreSale',
+        }
+        df['premios_modalidad'] = df.apply(
+            lambda row: historico.get(str(row['fecha']), {}).get('Premios', {}).get(
+                mapa_modalidades.get(row['modalidad']), {}
+            ),
+            axis=1,
+        )
+        columnas.append('premios_modalidad')
+        if juego == 'quini6':
+            df['premio_extra'] = df['fecha'].apply(
+                lambda fecha: historico.get(str(fecha), {}).get('Premios', {}).get('Extra', {}).get('6', {})
+            )
+            columnas.append('premio_extra')
+    return df[columnas].copy()
 
 
 def inferir_juego_historial(juego_nombre):
@@ -1570,11 +1616,30 @@ def evaluar_entry_historial_con_real(entry, df_real):
         numeros_real = row['numeros_real']
         coincidencias = sorted(pred_set & set(numeros_real))
         aciertos = len(coincidencias)
-        resultados_modalidad.append({
+        resultado_modalidad = {
             'modalidad': str(row['modalidad']),
             'aciertos': int(aciertos),
             'coincidencias': [int(n) for n in coincidencias]
-        })
+        }
+        if row['modalidad'] in (
+            'Loto Tradicional', 'Loto Match', 'Loto Desquite', 'Loto Sale o Sale',
+            'Tradicional', 'Segunda', 'Revancha', 'Siempre Sale',
+        ):
+            niveles = row.get('premios_modalidad', {})
+            nivel = niveles.get(str(aciertos), {})
+            vacante = nivel.get('ganadores') == 'Vacante'
+            if row['modalidad'] in ('Loto Tradicional', 'Loto Match', 'Tradicional', 'Segunda'):
+                tiene_premio = aciertos in (4, 5, 6) and not vacante
+            elif row['modalidad'] in ('Loto Desquite', 'Revancha'):
+                tiene_premio = aciertos == 6 and not vacante
+            else:
+                tiene_premio = bool(nivel) and not vacante
+            resultado_modalidad.update({
+                'tiene_premio': tiene_premio,
+                'premio_unitario': nivel.get('premio_unitario'),
+                'vacante': vacante,
+            })
+        resultados_modalidad.append(resultado_modalidad)
 
     if not resultados_modalidad:
         return None
@@ -1584,6 +1649,23 @@ def evaluar_entry_historial_con_real(entry, df_real):
         'fecha_real': str(fecha_real),
         'resultados_modalidad': resultados_modalidad,
     }
+
+    if inferir_juego_historial(entry.get('juego', 'Quini 6')) == 'quini6':
+        sorteos_extra = sorteos_fecha[
+            sorteos_fecha['modalidad'].isin(('Tradicional', 'Segunda', 'Revancha'))
+        ]
+        if len(sorteos_extra) == 3 and sorteos_extra['modalidad'].nunique() == 3:
+            numeros_extra = set().union(*sorteos_extra['numeros_real'])
+            coincidencias_extra = sorted(pred_set & numeros_extra)
+            nivel_extra = sorteos_extra.iloc[0].get('premio_extra', {})
+            vacante_extra = nivel_extra.get('ganadores') == 'Vacante'
+            resultado['pozo_extra'] = {
+                'aciertos': len(coincidencias_extra),
+                'coincidencias': coincidencias_extra,
+                'tiene_premio': len(pred_set) == 6 and len(coincidencias_extra) == 6 and not vacante_extra,
+                'premio_unitario': nivel_extra.get('premio_unitario'),
+                'vacante': vacante_extra,
+            }
 
     plus_pred = entry.get('numero_plus')
     plus_real = sorteos_fecha['numero_plus_real'].iloc[0] if 'numero_plus_real' in sorteos_fecha.columns and len(sorteos_fecha) > 0 else pd.NA
@@ -1595,6 +1677,72 @@ def evaluar_entry_historial_con_real(entry, df_real):
         resultado['plus_disponible'] = False
 
     return resultado
+
+
+def formatear_importe_premio(importe):
+    importe_formateado = f"{Decimal(importe):,.2f}".replace(',', '_').replace('.', ',').replace('_', '.')
+    return f"$ {importe_formateado}"
+
+
+def formatear_premio_historial(resultado):
+    """Muestra aciertos y premio base por persona solo en categorias premiadas."""
+    if not resultado.get('tiene_premio'):
+        return ""
+    aciertos = resultado['aciertos']
+    texto = f"{aciertos} acierto{'s' if aciertos != 1 else ''}"
+    importe = resultado.get('premio_unitario')
+    if importe is None:
+        return texto + " | Premio: no disponible"
+    return texto + f" | Premio: {formatear_importe_premio(importe)}"
+
+
+def formatear_premio_extra_historial(resultado):
+    """Muestra el premio por persona del Pozo Extra una sola vez por serie."""
+    if not resultado.get('tiene_premio'):
+        return ""
+    importe = resultado.get('premio_unitario')
+    if importe is None:
+        return "POZO EXTRA: 6 ACIERTOS | PREMIO NO DISPONIBLE"
+    return f"GANASTE EL POZO EXTRA {formatear_importe_premio(importe)}"
+
+
+def actualizar_premios_historial(pozos, juego):
+    """Completa los premios de las fechas evaluadas, sin alterar los pozos actuales."""
+    if juego == 'loto':
+        obtener = obtener_premios_loto_por_fecha
+        guardar = guardar_pozos_loto_json
+    elif juego == 'quini6':
+        obtener = obtener_premios_quini_por_fecha
+        guardar = guardar_pozos_json
+    else:
+        raise ValueError(f"Juego desconocido para actualizar premios: {juego}")
+    df_real = cargar_resultados_reales_historial(juego)
+    fechas = set()
+    for entry in st.session_state.get('historial', []):
+        if inferir_juego_historial(entry.get('juego', 'Quini 6')) != juego:
+            continue
+        evaluacion = evaluar_entry_historial_con_real(entry, df_real)
+        if evaluacion and evaluacion['estado'] == 'ok':
+            fechas.add(evaluacion['fecha_real'])
+    historico = pozos.setdefault('Historial_premios', {})
+    errores = []
+    fechas_pendientes = {
+        fecha for fecha in fechas
+        if fecha not in historico
+        or (juego == 'quini6' and 'Extra' not in historico[fecha].get('Premios', {}))
+    }
+    for fecha in sorted(fechas_pendientes):
+        try:
+            datos = obtener(fecha)
+            historico[fecha] = {'Meta': datos['Meta'], 'Premios': datos['Premios']}
+            if fecha == pozos.get('Meta', {}).get('fecha'):
+                pozos['Premios'] = datos['Premios']
+        except (requests.RequestException, ValueError, KeyError, TypeError) as e:
+            errores.append(f"{fecha}: {e}")
+    guardar(pozos)
+    if errores:
+        nombre = obtener_config_juego(juego)['nombre']
+        raise ValueError(f"No se pudieron actualizar algunos premios de {nombre}: " + "; ".join(errores))
 
 
 def mostrar_bolillas(numeros_sorteo, numeros_acertados):
@@ -2285,6 +2433,49 @@ def mostrar_portfolio(portfolio, freq_analyzer, portfolio_gen, metodo_nombre, nu
 # INTERFAZ PRINCIPAL
 # ============================================================================
 
+def formatear_numeros_loto(numeros):
+    if not isinstance(numeros, list) or len(numeros) != 6:
+        return None
+    try:
+        numeros_ordenados = sorted(int(numero) for numero in numeros)
+        return '-'.join(f"{numero:02d}" for numero in numeros_ordenados)
+    except (TypeError, ValueError):
+        return None
+
+
+def formatear_resumen_quini(csv_path):
+    """Formatea la ultima fecha del CSV real con los numeros en orden ascendente."""
+    df = pd.read_csv(csv_path)
+    if df.empty:
+        raise ValueError("El historico del Quini no contiene sorteos.")
+    fecha = pd.to_datetime(df['fecha']).max()
+    ultimos = df[pd.to_datetime(df['fecha']) == fecha].sort_values('sorteo_id')
+    if len(ultimos) != 4:
+        raise ValueError("La ultima fecha del Quini no contiene las cuatro modalidades.")
+    modalidades = [
+        ('Tradicional', 'Tradicional'),
+        ('Segunda', 'La segunda'),
+        ('Revancha', 'Revancha'),
+        ('SiempreSale', 'Siempre sale'),
+    ]
+    columnas = [f'num{i}' for i in range(1, 7)]
+    resultados = {
+        clave: [int(numero) for numero in fila]
+        for (clave, _), fila in zip(modalidades, ultimos[columnas].itertuples(index=False, name=None))
+    }
+    if any(
+        len(set(numeros)) != 6 or not all(0 <= numero <= 45 for numero in numeros)
+        for numeros in resultados.values()
+    ):
+        raise ValueError("El ultimo sorteo del Quini contiene numeros invalidos.")
+    detalle = f"Fecha {fecha:%d/%m/%Y}"
+    linea = ' | '.join(
+        f"{nombre} " + '-'.join(f"{numero:02d}" for numero in sorted(resultados[clave]))
+        for clave, nombre in modalidades
+    )
+    return detalle, linea
+
+
 def main():
     init_session_state()
     aplicar_fallback_copiado_nativo()
@@ -2314,6 +2505,15 @@ def main():
             seg_info  = seg_info  or '-'
             rev_info  = rev_info  or '-'
             ss_info   = ss_info   or '-'
+            bloque_resultados = ''
+            try:
+                detalle, resultados_txt = formatear_resumen_quini(config_juego_actual['csv_path'])
+                bloque_resultados = (
+                    f'<div style="margin-top:0.2rem;color:#999;font-size:0.78rem;">{detalle}</div>'
+                    f'<div style="margin-top:0.2rem;color:#ddd;font-size:0.76rem;line-height:1.35;">{resultados_txt}</div>'
+                )
+            except (OSError, ValueError, KeyError) as error:
+                st.warning(f"No se pudieron cargar los resultados del Quini: {error}")
             st.markdown(f"""
             <div class="pozos-container">
                 <div class="pozos-title">Pozos Actuales</div>
@@ -2339,6 +2539,7 @@ def main():
                         <div class="pozo-info">{ss_info}</div>
                     </div>
                 </div>
+                {bloque_resultados}
             </div>
             """, unsafe_allow_html=True)
 
@@ -2357,19 +2558,11 @@ def main():
             resultados = pozos.get('Resultados', {})
             meta = pozos.get('Meta', {})
 
-            def _fmt_nums(nums):
-                if not isinstance(nums, list) or len(nums) != 6:
-                    return None
-                try:
-                    return '-'.join([f"{int(n):02d}" for n in nums])
-                except Exception:
-                    return None
-
             lineas_resultados = []
-            trad_nums = _fmt_nums(resultados.get('Tradicional'))
-            match_nums = _fmt_nums(resultados.get('Match'))
-            desq_nums = _fmt_nums(resultados.get('Desquite'))
-            sale_nums = _fmt_nums(resultados.get('SaleOSale'))
+            trad_nums = formatear_numeros_loto(resultados.get('Tradicional'))
+            match_nums = formatear_numeros_loto(resultados.get('Match'))
+            desq_nums = formatear_numeros_loto(resultados.get('Desquite'))
+            sale_nums = formatear_numeros_loto(resultados.get('SaleOSale'))
             plus_num = resultados.get('Plus')
 
             if trad_nums:
@@ -2526,17 +2719,18 @@ def main():
                         pozos = None
                         if config_juego_actual['usa_pozos']:
                             if st.session_state.juego_actual == 'quini6':
-                                # QuiniYa.com.ar → pozos Quini6
-                                pozos = obtener_pozos_ultimo_sorteo()
+                                pozos = obtener_pozos_quini_oficial()
                                 if pozos:
                                     st.session_state.pozos_actuales = pozos
                                     guardar_pozos_json(pozos)
+                                    actualizar_premios_historial(pozos, 'quini6')
                             elif st.session_state.juego_actual == 'loto':
                                 # loto.loteriadelaciudad.gob.ar → pozos Loto
                                 pozos = obtener_pozos_loto()
                                 if pozos:
                                     st.session_state.pozos_loto = pozos
                                     guardar_pozos_loto_json(pozos)
+                                    actualizar_premios_historial(pozos, 'loto')
 
                         # Construir mensaje combinado
                         mensajes = []
@@ -2865,7 +3059,7 @@ def main():
         
         # Mostrar análisis si están activos
         if usar_regresion_equilibrio and regression_analyzer:
-            st.markdown("### Análisis de Regresión al Equilibrio")
+
             mostrar_analisis_regresion_equilibrio(regression_analyzer)
         
         if usar_resonancia_ciclos and cycle_resonance_analyzer:
@@ -2877,8 +3071,6 @@ def main():
             mostrar_analisis_multi_timeframe(multi_timeframe_analyzer)
         
         # Botón de generar predicción
-        st.markdown("## Generar Predicción")
-        
         col_btn1, col_btn2 = st.columns([1, 3])
         
         with col_btn1:
@@ -3174,6 +3366,8 @@ def main():
                         nums_cond = ', '.join([f"{int(n):02d}" for n in result['conditional']['combination']])
                         nums_rapido = ', '.join([f"{int(n):02d}" for n in prediccion_rapida['numeros']])
                         texto_copiar = f"{nombre_juego_copiar}:\nEstándar{opt_suffix}: {nums_std}\nCondicional{opt_suffix}: {nums_cond}\nRápido: {nums_rapido}\n"
+                        if st.session_state.juego_actual == 'loto':
+                            texto_copiar += f"Numero plus: {_plus_loto}\n"
 
                         mejor_metodo = calcular_mejor_metodo_historial()
                         if mejor_metodo:
@@ -3186,6 +3380,8 @@ def main():
                         if usar_optimizer:
                             texto_copiar = f"(Opt) {texto_copiar}"
                         texto_copiar = f"{nombre_juego_copiar}:\n" + texto_copiar
+                        if st.session_state.juego_actual == 'loto':
+                            texto_copiar += f"\nNumero plus: {_plus_loto}"
                         if lineas_pozos:
                             texto_copiar += "\n\n" + "\n".join(lineas_pozos)
                     
@@ -3202,8 +3398,6 @@ def main():
                             f'</div>',
                             unsafe_allow_html=True
                         )
-                        # Actualizar texto_copiar para incluir plus
-                        texto_copiar = texto_copiar + f"\nNumero plus: {_plus_loto}"
 
                     mostrar_bloque_copiable(
                         texto_copiar,
@@ -3531,6 +3725,46 @@ def main():
         col1, col2 = st.columns([1, 1])
         with col1:
             st.dataframe(pares_df, width='stretch', hide_index=True)
+
+        if st.session_state.juego_actual == 'loto':
+            st.markdown("---")
+            st.markdown("### Análisis del Número Plus")
+
+            csv_loto = obtener_config_juego('loto')['csv_path']
+            df_plus = pd.read_csv(csv_loto)
+            if 'numero_plus' in df_plus.columns:
+                serie_plus = pd.to_numeric(df_plus['numero_plus'], errors='coerce').dropna().astype(int)
+            else:
+                serie_plus = pd.Series(dtype='int64')
+
+            if serie_plus.empty:
+                st.info("No hay datos de Número Plus para analizar.")
+            else:
+                registros_recientes = serie_plus.tail(50)
+                prediccion_plus = predecir_numero_plus(csv_loto)
+                valores_plus = serie_plus.tolist()
+                filas_plus = []
+
+                for numero in range(10):
+                    posiciones = [i for i, valor in enumerate(valores_plus) if valor == numero]
+                    latencia = len(valores_plus) - 1 - posiciones[-1] if posiciones else len(valores_plus)
+                    filas_plus.append({
+                        'Número Plus': f"{numero:02d}",
+                        'Apariciones': len(posiciones),
+                        'Frecuencia histórica (%)': round(len(posiciones) / len(valores_plus) * 100, 2),
+                        'Últimos 50 registros': int((registros_recientes == numero).sum()),
+                        'Registros desde última aparición': latencia,
+                        'Score del modelo': round(prediccion_plus['scores'].get(numero, 0), 4),
+                    })
+
+                col_plus_tabla, col_plus_resumen = st.columns([3, 1])
+                with col_plus_tabla:
+                    st.dataframe(pd.DataFrame(filas_plus), width='stretch', hide_index=True)
+                with col_plus_resumen:
+                    st.metric("Mayor score", f"{prediccion_plus['numero_plus']:02d}")
+                    st.caption(
+                        "Alternativas: " + ", ".join(f"{numero:02d}" for numero in prediccion_plus['top3'][1:])
+                    )
     
     # ========================================================================
     # TAB 4: VISUALIZACIONES
@@ -3775,20 +4009,34 @@ def main():
 
             for fecha, entries in grupos_historial.items():
                 n_preds = len(entries)
+                evaluaciones = [
+                    evaluar_entry_historial_con_real(
+                        entry,
+                        resultados_reales_cache.get(inferir_juego_historial(entry.get('juego', 'Quini 6')))
+                    )
+                    for entry in entries
+                ]
+                tiene_premio_grupo = any(
+                    ev.get('pozo_extra', {}).get('tiene_premio')
+                    or any(r.get('tiene_premio') for r in ev.get('resultados_modalidad', []))
+                    for ev in evaluaciones if ev and ev.get('estado') == 'ok'
+                )
                 label = f"{fecha} - {n_preds} prediccion{'es' if n_preds > 1 else ''}"
+                if tiene_premio_grupo:
+                    label += "\u00a0\u00a0 :green[**•**]"
 
                 with st.expander(label):
-                    for entry in entries:
+                    for entry, evaluacion in zip(entries, evaluaciones):
                         juego_entry = entry.get('juego', 'Quini 6')
                         juego_key = inferir_juego_historial(juego_entry)
 
-                        evaluacion = evaluar_entry_historial_con_real(
-                            entry,
-                            resultados_reales_cache.get(juego_key)
-                        )
-
                         coincidencias_map = {}
+                        resultados_modalidad_map = {}
                         if evaluacion and evaluacion.get('estado') == 'ok':
+                            resultados_modalidad_map = {
+                                r['modalidad']: r
+                                for r in evaluacion.get('resultados_modalidad', [])
+                            }
                             coincidencias_map = {
                                 r.get('modalidad', ''): set(r.get('coincidencias', []))
                                 for r in evaluacion.get('resultados_modalidad', [])
@@ -3799,6 +4047,7 @@ def main():
                             modalidades_juego = ['Modalidad 1', 'Modalidad 2', 'Modalidad 3', 'Modalidad 4']
 
                         plus_entry = entry.get('numero_plus')
+                        plus_acertado = bool(evaluacion and evaluacion.get('acierto_plus'))
 
                         # Construir stats inline
                         stats_parts = []
@@ -3807,6 +4056,8 @@ def main():
                             stats_parts.append(f"Score: {entry['scores']['score_promedio']:.3f}")
                             stats_parts.append(f"Pares: {entry['scores']['pares']}/6")
                         stats_texto = " &nbsp;|&nbsp; ".join(stats_parts)
+                        if evaluacion and evaluacion.get('estado') == 'ok':
+                            stats_texto = f"Sorteo: {evaluacion['fecha_real']} &nbsp;|&nbsp; {stats_texto}"
 
                         filas_modalidad_html = []
                         for idx, modalidad in enumerate(modalidades_juego):
@@ -3825,22 +4076,53 @@ def main():
 
                             numeros_texto = "<span style='display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap;'>" + "".join(numeros_html_parts) + "</span>"
                             if plus_entry is not None:
-                                numeros_texto += f" &nbsp;+&nbsp; <span style='color:#2EC4B6;font-weight:700;'>Plus: {plus_entry}</span>"
+                                if plus_acertado:
+                                    plus_html = (
+                                        f"<span style='display:inline-flex;align-items:center;gap:4px;color:#2EC4B6;font-weight:700;'>Plus: "
+                                        f"<span style='display:inline-flex;align-items:center;justify-content:center;"
+                                        f"width:24px;height:24px;border-radius:50%;background:#2EC4B6;color:#fff;"
+                                        f"font-size:0.80rem;font-weight:700;'>{int(plus_entry):02d}</span></span>"
+                                    )
+                                else:
+                                    plus_html = f"<span style='color:#2EC4B6;font-weight:700;'>Plus: {plus_entry}</span>"
+                                numeros_texto += f" &nbsp;+&nbsp; {plus_html}"
 
                             stats_columna = stats_texto if idx == 0 else ""
+                            premio_html = ""
+                            resultado_modalidad = resultados_modalidad_map.get(modalidad)
+                            if resultado_modalidad:
+                                premio_texto = formatear_premio_historial(resultado_modalidad)
+                                if premio_texto:
+                                    premio_html = (
+                                        f"<div style='font-size:0.82rem;color:#2EC4B6;"
+                                        f"font-weight:700;text-transform:uppercase;'>{premio_texto}</div>"
+                                    )
                             borde_fila = "border-bottom: 1px solid rgba(200,200,200,0.2);" if idx < len(modalidades_juego) - 1 else ""
 
                             filas_modalidad_html.append(
                                 f"<div style='display:flex;align-items:center;gap:20px;padding:5px 0;{borde_fila}'>"
                                 f"<div style='min-width: 220px; font-weight: 600; color: #2EC4B6; font-size: 0.85rem;'>{juego_entry} - {entry['metodo']} - {modalidad}</div>"
                                 f"<div style='font-size: 0.95rem; min-width: 220px;'>{numeros_texto}</div>"
+                                f"{premio_html}"
                                 f"<div style='color: #888; font-size: 0.82rem;'>{stats_columna}</div>"
                                 f"</div>"
                             )
 
+                        premio_extra_html = ""
+                        if evaluacion and evaluacion.get('estado') == 'ok':
+                            premio_extra_texto = formatear_premio_extra_historial(
+                                evaluacion.get('pozo_extra', {})
+                            )
+                            if premio_extra_texto:
+                                premio_extra_html = (
+                                    f"<div style='font-size:0.82rem;color:#1B98C9;"
+                                    f"font-weight:700;padding:5px 0;'>{premio_extra_texto}</div>"
+                                )
+
                         st.markdown(
                             f"<div style='border-bottom: 1px solid rgba(200,200,200,0.3);'>"
                             f"{''.join(filas_modalidad_html)}"
+                            f"{premio_extra_html}"
                             f"</div>",
                             unsafe_allow_html=True
                         )
@@ -4538,5 +4820,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
