@@ -1389,6 +1389,19 @@ def guardar_parametros_inversiones_si_cambian():
 def inicializar_parametros_inversiones():
     """Cargar los parámetros guardados en session_state la primera vez que se abre la sesión"""
     if st.session_state.get('_params_inv_init'):
+        # Streamlit descarta las claves de widgets que no se renderizan (p. ej. al cambiar de juego)
+        guardados = st.session_state.get('_params_inv_guardados', {})
+        for clave in list(PARAMETROS_INV_CONFIG) + ['tna_input']:
+            if clave not in st.session_state and clave in guardados:
+                st.session_state[clave] = guardados[clave]
+        if 'gastos_portfolio' not in st.session_state:
+            st.session_state['gastos_portfolio'] = {
+                int(mes): monto for mes, monto in guardados.get('gastos_portfolio', {}).items()
+            }
+        if 'premio_input' not in st.session_state:
+            st.session_state['premio_input'] = f"{int(st.session_state.premio_inv):,}".replace(',', '.')
+        if 'premio_portfolio_input' not in st.session_state:
+            st.session_state['premio_portfolio_input'] = f"{int(st.session_state.premio_portfolio):,}".replace(',', '.')
         return
     params, gastos = cargar_parametros_inversiones()
     for clave, valor in params.items():
