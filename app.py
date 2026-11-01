@@ -123,6 +123,24 @@ st.markdown("""
         padding-bottom: 16px;
     }
 
+    /* Encabezado principal fijo al hacer scroll */
+    [data-testid="stElementContainer"]:has(> [data-testid="stMarkdown"] .app-banner) {
+        position: sticky;
+        top: 3rem;
+        z-index: 999;
+    }
+
+    /* Franja superior fija para que el contenido no se vea detrás del banner */
+    [data-testid="stElementContainer"]:has(> [data-testid="stMarkdown"] .app-banner)::before {
+        content: "";
+        position: absolute;
+        top: -3rem;
+        left: -1rem;
+        right: -1rem;
+        height: 3rem;
+        background-color: #f8f9fa;
+    }
+
     .banner-logo {
         background: white;
         width: 36px;
@@ -546,14 +564,40 @@ st.markdown("""
     
     /* Inputs y selectbox estilo Charly */
     input, select, textarea {
-        border-radius: 50px !important;
-        border: 2px solid #e0e0e0 !important;
-        padding: 10px 16px !important;
+        border-radius: 4px !important;
+        border: 1px solid #d0d5dd !important;
+        padding: 6px 10px !important;
+    }
+
+    /* Contenedores de Streamlit sin recorte ni radio propio para que el borde del input no se pierda */
+    [data-baseweb="input"],
+    [data-baseweb="base-input"],
+    [data-baseweb="textarea"] {
+        border-radius: 4px !important;
+        overflow: visible !important;
+    }
+
+    div[data-baseweb="select"] > div {
+        border-radius: 4px !important;
+    }
+
+    /* Campos numéricos con la misma altura que los de texto */
+    section[data-testid="stMain"] [data-testid="stNumberInput"] [data-baseweb="input"] {
+        height: 40px !important;
+        min-height: 40px !important;
+    }
+
+    /* Campos calculados (solo lectura) */
+    input:disabled {
+        background-color: #f0f2f6 !important;
+        color: #333333 !important;
+        -webkit-text-fill-color: #333333 !important;
+        cursor: default !important;
     }
     
     input:focus, select:focus, textarea:focus {
         border-color: #2EC4B6 !important;
-        box-shadow: 0 0 0 3px rgba(46, 196, 182, 0.15) !important;
+        box-shadow: 0 0 0 2px rgba(46, 196, 182, 0.15) !important;
     }
     
     /* Mensajes Success/Info/Warning - Estilo Midasmind con mayor especificidad */
@@ -897,6 +941,10 @@ HISTORIAL_FILE = Path('data/historial_predicciones.json')
 POZOS_FILE = Path('data/pozos_actuales.json')
 POZOS_LOTO_FILE = Path('data/loto/pozos_loto.json')
 GASTOS_FILE = Path('data/gastos_inversiones.json')
+PARAMETROS_INV_FILE = Path('data/parametros_inversiones.json')
+# Premios de lotería: se grava el 90% del premio con alícuota del 31% (retención efectiva 27,9%)
+GRAVADO_PREMIO = 0.9
+ALICUOTA_PREMIO = 0.31
 
 GAME_CONFIGS = {
     'quini6': {
@@ -1262,6 +1310,98 @@ def cargar_gastos_json():
     except Exception as e:
         print(f"No se pudo cargar gastos: {str(e)}")
         return None
+
+# Parámetros de la pestaña Inversiones: clave de session_state -> (valor por defecto, mínimo, máximo)
+PARAMETROS_INV_CONFIG = {
+    'premio_inv': (7310000000.0, 0.0, None),
+    'meses_inv': (12, 1, 60),
+    'premio_portfolio': (7310000000.0, 0.0, None),
+    'inflacion_portfolio': (3.0, 0.0, 50.0),
+    'meses_portfolio': (12, 1, 60),
+    'pct_pf': (30.0, 0.0, 100.0),
+    'tasa_pf': (84.0, 0.0, 500.0),
+    'pct_cer': (30.0, 0.0, 100.0),
+    'tasa_cer': (42.0, 0.0, 500.0),
+    'pct_usd': (40.0, 0.0, 100.0),
+    'tasa_usd': (6.0, 0.0, 500.0),
+}
+TNA_INV_DEFAULT = "27.00"
+
+def cargar_parametros_inversiones():
+    """Cargar parámetros de Inversiones desde JSON; valores inválidos o faltantes usan el default"""
+    datos = {}
+    try:
+        if PARAMETROS_INV_FILE.exists():
+            with open(PARAMETROS_INV_FILE, 'r', encoding='utf-8') as f:
+                datos = json.load(f)
+    except Exception as e:
+        print(f"No se pudieron cargar parámetros de inversiones: {str(e)}")
+        datos = {}
+    if not isinstance(datos, dict):
+        datos = {}
+
+    params = {}
+    for clave, (defecto, minimo, maximo) in PARAMETROS_INV_CONFIG.items():
+        try:
+            valor = type(defecto)(datos.get(clave, defecto))
+            valor = max(minimo, valor)
+            if maximo is not None:
+                valor = min(maximo, valor)
+        except (TypeError, ValueError):
+            valor = defecto
+        params[clave] = valor
+
+    tna = datos.get('tna_input', TNA_INV_DEFAULT)
+    params['tna_input'] = tna if isinstance(tna, str) and tna.strip() else TNA_INV_DEFAULT
+
+    gastos = {}
+    gastos_guardados = datos.get('gastos_portfolio', {})
+    if isinstance(gastos_guardados, dict):
+        for mes, monto in gastos_guardados.items():
+            try:
+                gastos[int(mes)] = float(monto)
+            except (TypeError, ValueError):
+                continue
+    return params, gastos
+
+def obtener_parametros_inversiones_actuales():
+    """Parámetros de Inversiones vigentes en session_state, listos para serializar"""
+    actuales = {clave: st.session_state[clave] for clave in PARAMETROS_INV_CONFIG}
+    actuales['tna_input'] = st.session_state.tna_input
+    actuales['gastos_portfolio'] = {
+        str(mes): monto for mes, monto in sorted(st.session_state.gastos_portfolio.items())
+    }
+    return actuales
+
+def guardar_parametros_inversiones_si_cambian():
+    """Guardar los parámetros de Inversiones solo cuando difieren de lo ya guardado"""
+    actuales = obtener_parametros_inversiones_actuales()
+    if actuales == st.session_state.get('_params_inv_guardados'):
+        return
+    try:
+        PARAMETROS_INV_FILE.parent.mkdir(parents=True, exist_ok=True)
+        with open(PARAMETROS_INV_FILE, 'w', encoding='utf-8') as f:
+            json.dump(actuales, f, indent=2, ensure_ascii=False)
+        st.session_state['_params_inv_guardados'] = actuales
+    except Exception as e:
+        print(f"No se pudieron guardar parámetros de inversiones: {str(e)}")
+
+def inicializar_parametros_inversiones():
+    """Cargar los parámetros guardados en session_state la primera vez que se abre la sesión"""
+    if st.session_state.get('_params_inv_init'):
+        return
+    params, gastos = cargar_parametros_inversiones()
+    for clave, valor in params.items():
+        st.session_state.setdefault(clave, valor)
+    st.session_state.setdefault(
+        'premio_input', f"{int(st.session_state.premio_inv):,}".replace(',', '.')
+    )
+    st.session_state.setdefault(
+        'premio_portfolio_input', f"{int(st.session_state.premio_portfolio):,}".replace(',', '.')
+    )
+    st.session_state.setdefault('gastos_portfolio', gastos)
+    st.session_state['_params_inv_guardados'] = obtener_parametros_inversiones_actuales()
+    st.session_state['_params_inv_init'] = True
 
 def obtener_ultima_fecha_csv(juego='quini6'):
     """Obtener la última fecha del archivo CSV"""
@@ -4180,7 +4320,8 @@ def main():
         
         st.markdown("<div style='margin: 0.2rem 0;'><hr style='margin: 0;'/></div>", unsafe_allow_html=True)
 
-        # Inicializar valores en session_state
+        # Inicializar valores en session_state (desde el archivo guardado)
+        inicializar_parametros_inversiones()
         if 'premio_inv' not in st.session_state:
             st.session_state.premio_inv = 7310000000.0
         
@@ -4189,8 +4330,6 @@ def main():
         col_premio, col_base, col_tna, col_meses, col_spacer = st.columns([0.7, 0.7, 0.7, 0.4, 2.2])
         
         with col_premio:
-            st.markdown('<p style="margin-bottom: 0rem;">Premio</p>', unsafe_allow_html=True)
-            
             # Callback para formatear con puntos de miles al cambiar
             def formatear_premio():
                 raw = st.session_state.premio_input.replace('.', '').replace(',', '.')
@@ -4208,7 +4347,6 @@ def main():
             # Input de texto con formato
             st.text_input(
                 "Premio",
-                label_visibility="collapsed",
                 key="premio_input",
                 on_change=formatear_premio
             )
@@ -4221,16 +4359,13 @@ def main():
                 premio = st.session_state.premio_inv
         
         with col_base:
-            st.markdown('<p style="margin-bottom: 0rem;">Base</p>', unsafe_allow_html=True)
-            # BASE se calcula según fórmula: PREMIO - ((PREMIO * 0.9) * 0.31)
-            base = premio - ((premio * 0.9) * 0.31)
+            base = premio * (1 - GRAVADO_PREMIO * ALICUOTA_PREMIO)
             base_formateado = f"{base:,.0f}".replace(',', '.')
-            st.markdown(f"<div style='padding: 8px 12px; background-color: #f0f2f6; border-radius: 4px; text-align: center; font-size: 16px;'>{base_formateado}</div>", unsafe_allow_html=True)
+            st.text_input("Base", value=base_formateado, disabled=True, key=f"base_inv_{base_formateado}")
         
         with col_tna:
             tna_texto = st.text_input(
                 "TNA (%)",
-                value="27.00",
                 key="tna_input"
             )
             try:
@@ -4243,10 +4378,10 @@ def main():
         with col_meses:
             meses = st.number_input(
                 "Meses",
-                value=12,
                 min_value=1,
                 max_value=60,
-                step=1
+                step=1,
+                key="meses_inv"
             )
         
         st.markdown('</div>', unsafe_allow_html=True)
@@ -4483,8 +4618,6 @@ def main():
         col1, col2, col3, col4, col_spacer = st.columns([0.7, 0.7, 0.7, 0.4, 2.5])
         
         with col1:
-            st.markdown('<p style="margin-bottom: 0rem;">Premio</p>', unsafe_allow_html=True)
-            
             # Callback para formatear con puntos de miles al cambiar
             def formatear_premio_portfolio():
                 raw = st.session_state.premio_portfolio_input.replace('.', '').replace(',', '.')
@@ -4502,7 +4635,6 @@ def main():
             # Input de texto con formato
             st.text_input(
                 "Premio",
-                label_visibility="collapsed",
                 key="premio_portfolio_input",
                 on_change=formatear_premio_portfolio
             )
@@ -4515,26 +4647,23 @@ def main():
                 premio_portfolio = st.session_state.premio_portfolio
         
         with col2:
-            st.markdown('<p style="margin-bottom: 0rem;">Base</p>', unsafe_allow_html=True)
-            # BASE se calcula según fórmula: PREMIO - ((PREMIO * 0.9) * 0.31)
-            base_portfolio = premio_portfolio - ((premio_portfolio * 0.9) * 0.31)
+            base_portfolio = premio_portfolio * (1 - GRAVADO_PREMIO * ALICUOTA_PREMIO)
             base_portfolio_formateado = f"{base_portfolio:,.0f}".replace(',', '.')
-            st.markdown(f"<div style='padding: 8px 12px; background-color: #f0f2f6; border-radius: 4px; text-align: center; font-size: 16px;'>{base_portfolio_formateado}</div>", unsafe_allow_html=True)
+            st.text_input("Base", value=base_portfolio_formateado, disabled=True, key=f"base_portfolio_{base_portfolio_formateado}")
         
         with col3:
             inflacion = st.number_input(
                 "Inflación mensual (%)",
-                value=3.0,
                 min_value=0.0,
                 max_value=50.0,
                 step=0.5,
-                format="%.2f"
+                format="%.2f",
+                key="inflacion_portfolio"
             )
         
         with col4:
             meses_portfolio = st.number_input(
                 "Meses",
-                value=12,
                 min_value=1,
                 max_value=60,
                 step=1,
@@ -4547,30 +4676,26 @@ def main():
         col_pf1, col_pf2, col_cer1, col_cer2, col_usd1, col_usd2, col_spacer2 = st.columns([0.35, 0.35, 0.35, 0.35, 0.35, 0.35, 2.25])
         
         with col_pf1:
-            st.markdown('<p style="margin-bottom: 0.3rem;">PF %</p>', unsafe_allow_html=True)
-            pct_pf = st.number_input("Porcentaje (%)", value=30.0, min_value=0.0, max_value=100.0, step=5.0, format="%.1f", key="pct_pf", label_visibility="collapsed")
+            pct_pf = st.number_input("PF %", min_value=0.0, max_value=100.0, step=5.0, format="%.1f", key="pct_pf")
         with col_pf2:
-            st.markdown('<p style="margin-bottom: 0.3rem;">PF Tasa</p>', unsafe_allow_html=True)
-            tasa_pf = st.number_input("Tasa anual (%)", value=84.0, min_value=0.0, max_value=500.0, step=1.0, format="%.2f", key="tasa_pf", label_visibility="collapsed")
+            tasa_pf = st.number_input("PF Tasa", min_value=0.0, max_value=500.0, step=1.0, format="%.2f", key="tasa_pf")
         
         with col_cer1:
-            st.markdown('<p style="margin-bottom: 0.3rem;">FCI CER %</p>', unsafe_allow_html=True)
-            pct_cer = st.number_input("Porcentaje (%)", value=30.0, min_value=0.0, max_value=100.0, step=5.0, format="%.1f", key="pct_cer", label_visibility="collapsed")
+            pct_cer = st.number_input("FCI CER %", min_value=0.0, max_value=100.0, step=5.0, format="%.1f", key="pct_cer")
         with col_cer2:
-            st.markdown('<p style="margin-bottom: 0.3rem;">FCI CER Tasa</p>', unsafe_allow_html=True)
-            tasa_cer = st.number_input("Tasa anual (%)", value=42.0, min_value=0.0, max_value=500.0, step=1.0, format="%.2f", key="tasa_cer", label_visibility="collapsed")
+            tasa_cer = st.number_input("FCI CER Tasa", min_value=0.0, max_value=500.0, step=1.0, format="%.2f", key="tasa_cer")
         
         with col_usd1:
-            st.markdown('<p style="margin-bottom: 0.3rem;">FCI USD %</p>', unsafe_allow_html=True)
-            pct_usd = st.number_input("Porcentaje (%)", value=40.0, min_value=0.0, max_value=100.0, step=5.0, format="%.1f", key="pct_usd", label_visibility="collapsed")
+            pct_usd = st.number_input("FCI USD %", min_value=0.0, max_value=100.0, step=5.0, format="%.1f", key="pct_usd")
         with col_usd2:
-            st.markdown('<p style="margin-bottom: 0.3rem;">FCI USD Tasa</p>', unsafe_allow_html=True)
-            tasa_usd = st.number_input("Tasa anual (%)", value=6.0, min_value=0.0, max_value=500.0, step=1.0, format="%.2f", key="tasa_usd", label_visibility="collapsed")
+            tasa_usd = st.number_input("FCI USD Tasa", min_value=0.0, max_value=500.0, step=1.0, format="%.2f", key="tasa_usd")
         
         # Validar que la suma de porcentajes sea 100%
         suma_pct = pct_pf + pct_cer + pct_usd
         if abs(suma_pct - 100.0) > 0.1:
             st.warning(f"La suma de porcentajes debe ser 100% (actual: {suma_pct:.1f}%)")
+
+        guardar_parametros_inversiones_si_cambian()
         
         # Limpiar gastos de meses que exceden el nuevo límite
         if st.session_state.gastos_portfolio:
