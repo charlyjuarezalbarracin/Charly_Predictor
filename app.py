@@ -123,6 +123,24 @@ st.markdown("""
         padding-bottom: 16px;
     }
 
+    /* Encabezado principal fijo al hacer scroll */
+    [data-testid="stElementContainer"]:has(> [data-testid="stMarkdown"] .app-banner) {
+        position: sticky;
+        top: 3rem;
+        z-index: 999;
+    }
+
+    /* Franja superior fija para que el contenido no se vea detrás del banner */
+    [data-testid="stElementContainer"]:has(> [data-testid="stMarkdown"] .app-banner)::before {
+        content: "";
+        position: absolute;
+        top: -3rem;
+        left: -1rem;
+        right: -1rem;
+        height: 3rem;
+        background-color: #f8f9fa;
+    }
+
     .banner-logo {
         background: white;
         width: 36px;
