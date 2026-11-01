@@ -1680,3 +1680,7 @@ sorteo_id,fecha,modalidad,num1,num2,num3,num4,num5,num6,numero_plus
 1679,2026-10-28,Loto Match,0,2,20,23,32,37,3
 1680,2026-10-28,Loto Desquite,16,18,24,25,27,31,3
 1681,2026-10-28,Loto Sale o Sale,9,13,16,18,20,37,3
+1682,2026-10-31,Loto Tradicional,2,8,20,24,30,40,6
+1683,2026-10-31,Loto Match,9,14,16,19,27,42,6
+1684,2026-10-31,Loto Desquite,6,13,17,36,41,42,6
+1685,2026-10-31,Loto Sale o Sale,2,9,26,29,33,41,6

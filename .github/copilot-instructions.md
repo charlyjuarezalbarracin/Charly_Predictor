@@ -1,6 +1,8 @@
 # Instrucciones para GitHub Copilot - Charly Predictor
 
 ## 🚫 NO Hacer
+- NO borrar nunca los resultados históricos existentes de Loto ni Quini (incluidas filas de sus CSV); cualquier actualización debe conservarlos íntegramente.
+- NO ejecutar cambios que puedan eliminar, truncar o reemplazar esos datos sin una copia de seguridad verificada y autorización explícita del usuario.
 - NO agregar emojis/íconos a botones, labels o elementos de UI
 - NO agregar emojis/íconos en labels, checkboxes, radio buttons, o cualquier elemento visual
 - NO usar colores que se salgan del diseño actual (tema Charly: azul marino #1B2A4A + teal #2EC4B6)
