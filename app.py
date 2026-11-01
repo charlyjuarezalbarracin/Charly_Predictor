@@ -942,7 +942,9 @@ POZOS_FILE = Path('data/pozos_actuales.json')
 POZOS_LOTO_FILE = Path('data/loto/pozos_loto.json')
 GASTOS_FILE = Path('data/gastos_inversiones.json')
 PARAMETROS_INV_FILE = Path('data/parametros_inversiones.json')
-IMPUESTO_PREMIO = 0.27
+# Premios de lotería: se grava el 90% del premio con alícuota del 31% (retención efectiva 27,9%)
+GRAVADO_PREMIO = 0.9
+ALICUOTA_PREMIO = 0.31
 
 GAME_CONFIGS = {
     'quini6': {
@@ -4357,8 +4359,7 @@ def main():
                 premio = st.session_state.premio_inv
         
         with col_base:
-            # Base = premio menos 27% de impuesto a los premios de lotería
-            base = premio * (1 - IMPUESTO_PREMIO)
+            base = premio * (1 - GRAVADO_PREMIO * ALICUOTA_PREMIO)
             base_formateado = f"{base:,.0f}".replace(',', '.')
             st.text_input("Base", value=base_formateado, disabled=True, key=f"base_inv_{base_formateado}")
         
@@ -4646,8 +4647,7 @@ def main():
                 premio_portfolio = st.session_state.premio_portfolio
         
         with col2:
-            # Base = premio menos 27% de impuesto a los premios de lotería
-            base_portfolio = premio_portfolio * (1 - IMPUESTO_PREMIO)
+            base_portfolio = premio_portfolio * (1 - GRAVADO_PREMIO * ALICUOTA_PREMIO)
             base_portfolio_formateado = f"{base_portfolio:,.0f}".replace(',', '.')
             st.text_input("Base", value=base_portfolio_formateado, disabled=True, key=f"base_portfolio_{base_portfolio_formateado}")
         
