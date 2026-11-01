@@ -4127,14 +4127,27 @@ def main():
                             unsafe_allow_html=True
                         )
             
-            # Botón para limpiar historial
+            # Esta acción limpia predicciones; nunca borrar los CSV históricos de sorteos.
             if st.button("Limpiar Historial", type="secondary"):
-                st.session_state.historial = []
-                st.session_state.prediction_count = 0
-                # Eliminar archivo JSON
-                if HISTORIAL_FILE.exists():
-                    HISTORIAL_FILE.unlink()
-                st.rerun()
+                st.session_state.confirmar_limpieza_historial = True
+
+            if st.session_state.get('confirmar_limpieza_historial', False):
+                st.warning(
+                    "Esto eliminará el historial de predicciones, pero no los CSV históricos de sorteos."
+                )
+                col_confirmar, col_cancelar = st.columns(2)
+                with col_confirmar:
+                    if st.button("Confirmar eliminación", type="secondary"):
+                        if HISTORIAL_FILE.exists():
+                            HISTORIAL_FILE.unlink()
+                        st.session_state.historial = []
+                        st.session_state.prediction_count = 0
+                        st.session_state.confirmar_limpieza_historial = False
+                        st.rerun()
+                with col_cancelar:
+                    if st.button("Cancelar", type="secondary"):
+                        st.session_state.confirmar_limpieza_historial = False
+                        st.rerun()
 
     # ========================================================================
     # TAB 7: INVERSIONES
